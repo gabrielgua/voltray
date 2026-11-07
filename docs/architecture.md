@@ -41,7 +41,7 @@ Why two processes: in [phase 0](phase0.md), a NativeAOT WinUI 3 window cost ~107
 ## Category classification (in priority order)
 
 1. **User override** (`Confidence.User`)
-2. **Provider-reported** (`Confidence.Reported`): HID++ device type, Bluetooth Class of Device / BLE Appearance, HID top-level usage (Generic Desktop mouse 0x02 / keyboard 0x06 / gamepad 0x05)
+2. **Provider-reported** (`Confidence.Reported`): HID++ device type, Bluetooth Class of Device / BLE Appearance (see [protocols/bluetooth.md](protocols/bluetooth.md)), HID top-level usage (Generic Desktop mouse 0x02 / keyboard 0x06 / gamepad 0x05)
 3. **Name heuristics** (`Confidence.Guess`): "Buds", "WF-", "WH-", "Keychron"...
 4. Otherwise **Other**. Devices are never dropped for being unclassified.
 
@@ -54,4 +54,4 @@ Why two processes: in [phase 0](phase0.md), a NativeAOT WinUI 3 window cost ~107
 
 ## Threading
 
-Providers run on the thread pool and write to `DeviceRegistry` under a lock. `Changed` posts a single coalesced `WM_APP` message to the tray window, and all `Shell_NotifyIcon` calls happen on the UI thread.
+Providers start in parallel on the thread pool and write to `DeviceRegistry` under a lock. `Changed` posts a single coalesced `WM_APP` message to the tray window, and all `Shell_NotifyIcon` calls happen on the UI thread.

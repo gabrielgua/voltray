@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Voltray.Core;
+using Voltray.Providers.Bluetooth;
 using Voltray.Providers.Logitech;
 using Voltray.Tray;
 using static Voltray.Interop.Win32;
@@ -20,7 +21,7 @@ internal static class Program
     static int _updatePending;
     static Settings _settings = new();
     static readonly DeviceRegistry Registry = new();
-    static readonly List<IBatteryProvider> Providers = [new LogitechProvider()];
+    static readonly List<IBatteryProvider> Providers = [new LogitechProvider(), new BluetoothProvider()];
     static TrayManager? _tray;
 
     [STAThread]
@@ -65,11 +66,12 @@ internal static class Program
 
     static async Task StartProvidersAsync()
     {
-        foreach (var p in Providers)
+        // In parallel: a sleeping Logitech device must not delay Bluetooth, and vice versa.
+        await Task.WhenAll(Providers.Select(async p =>
         {
             try { await p.StartAsync(Registry, CancellationToken.None); }
             catch (Exception e) { Log.Error($"provider {p.Id} failed to start", e); }
-        }
+        }));
         PostMessage(_hwnd, WM_DEVICES_CHANGED, 0, 0); // shows the "no devices" icon if nothing was found
     }
 

@@ -4,7 +4,7 @@
 
 Voltray shows the battery of your mouse, keyboard, headphones, earbuds and controllers next to the Windows clock, with one icon per device category. It is a small native background app with no vendor software required.
 
-> **Status: early development (v0.1.0-dev).** Logitech HID++ devices work today. Bluetooth devices and the settings window are next. See the [roadmap](#roadmap).
+> **Status: early development (v0.1.0-dev).** Logitech HID++ works and is tested on hardware. Bluetooth support is implemented but not yet verified with a real device ([help wanted](#device-support)). The settings window is next. See the [roadmap](#roadmap).
 
 ![Tray icons in both styles, at 16–32 px, on dark and light taskbars](docs/images/tray-icons.png)
 
@@ -24,14 +24,14 @@ Voltray only shows what a device reports. Some devices never report battery to t
 | Source | Status | Notes |
 |---|---|---|
 | Logitech LIGHTSPEED / Unifying / Bolt receivers (HID++ 2.0) | ✅ Working | Exact percentage on newer devices (feature 0x1004). Estimated from voltage on older ones. Tested: PRO X Superlight 2. |
-| Bluetooth Classic headsets (HFP) | 🔜 Next | Uses the battery level Windows already exposes. |
-| Bluetooth LE (GATT Battery Service) | 🔜 Next | Keyboards, mice and earbuds that use the standard battery service. |
+| Bluetooth Classic headsets (HFP) | 🧪 Implemented, untested | Same level Windows shows in Settings, pushed on change. |
+| Bluetooth LE | 🧪 Implemented, untested | Windows-read level, or the GATT Battery Service with notifications as fallback. |
 | Xbox controllers (GameInput) | 🗓 Planned | |
 | DualSense / DualShock | 🗓 Planned | |
 | Razer, SteelSeries, HyperX, Corsair | 🔬 Needs research | Proprietary protocols, one provider per vendor. |
 | Generic 2.4 GHz dongles | ❌ Not possible | They do not send battery information. |
 
-Your device is not detected? Run `HidppProbe.exe --list` (Logitech) and open a [device support issue](../../issues/new?template=device-support.yml).
+Your device is not detected? Run `HidppProbe.exe --list` (Logitech) or `BluetoothProbe.exe` (Bluetooth) and open a [device support issue](../../issues/new?template=device-support.yml). Bluetooth reports are especially welcome right now.
 
 ## Install
 
@@ -43,7 +43,7 @@ cd voltray
 dotnet publish src/Voltray -c Release -r win-x64 -o artifacts/publish/Voltray
 ```
 
-Requirements: Windows 10 19041+ or Windows 11, the [.NET 10 SDK](https://dotnet.microsoft.com/download), and the Visual Studio C++ build tools (for NativeAOT).
+Requirements: Windows 10 2004 (19041)+ or Windows 11, the [.NET 10 SDK](https://dotnet.microsoft.com/download), and the Visual Studio C++ build tools (for NativeAOT).
 
 ### Why is my icon hidden?
 
@@ -53,7 +53,7 @@ New tray icons go to the overflow (^) area by default. Windows leaves that choic
 
 ```
 Voltray.exe (background, Win32 + NativeAOT, ~5 MB)
- ├─ Providers ── Logitech HID++ · Bluetooth (next) · ...   report devices + readings
+ ├─ Providers ── Logitech HID++ · Bluetooth · ...   report devices + readings
  ├─ DeviceRegistry ── classification, user overrides, last-known state
  └─ TrayManager ── one icon per category, tooltips, menus
 
@@ -64,7 +64,7 @@ The settings UI runs as a separate process because WinUI 3 keeps ~100 MB in memo
 
 ## Roadmap
 
-- **v0.1:** Logitech HID++ ✅, Bluetooth HFP + BLE battery, low-battery notifications, start with Windows, settings window (dashboard, settings, about), releases on GitHub.
+- **v0.1:** Logitech HID++ ✅, Bluetooth HFP + BLE battery 🧪, low-battery notifications, start with Windows, settings window (dashboard, settings, about), releases on GitHub.
 - **v0.2:** Xbox / GameInput, DualSense, 7-day history, device nicknames, diagnostics export.
 - **v0.3:** Razer, SteelSeries, HyperX, Corsair providers.
 - **Later:** rich hover cards, winget, code signing, localization (en / pt-BR), external provider plugins.

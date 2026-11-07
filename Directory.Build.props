@@ -14,6 +14,13 @@
     <RepositoryUrl>https://github.com/gabrielgua/voltray</RepositoryUrl>
   </PropertyGroup>
 
+  <!-- WinRT under NativeAOT: generate the COM vtables for every managed type passed to WinRT
+       (e.g. string[] as IEnumerable<string>) and warn about any call site it cannot cover. -->
+  <PropertyGroup>
+    <CsWinRTAotOptimizerEnabled>true</CsWinRTAotOptimizerEnabled>
+    <CsWinRTAotWarningLevel>2</CsWinRTAotWarningLevel>
+  </PropertyGroup>
+
   <!-- Libraries must stay trimmable: the tray host ships as a NativeAOT single exe. -->
   <PropertyGroup Condition="'$(OutputType)' == 'Library' and '$(IsTestProject)' != 'true'">
     <IsAotCompatible>true</IsAotCompatible>

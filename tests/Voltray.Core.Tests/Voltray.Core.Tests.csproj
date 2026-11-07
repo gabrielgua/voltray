@@ -1,8 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Voltray.Core\Voltray.Core.csproj" />
+    <ProjectReference Include="..\..\src\Voltray.Providers.Bluetooth\Voltray.Providers.Bluetooth.csproj" />
   </ItemGroup>
 
 </Project>

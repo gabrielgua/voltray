@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- WinRT projections for Windows.Devices.Enumeration / Bluetooth -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks> <!-- required by CsWinRT AOT generated code -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Voltray.Core\Voltray.Core.csproj" />
+    <InternalsVisibleTo Include="Voltray.Core.Tests" />
+  </ItemGroup>
+
+</Project>
