@@ -1,10 +1,9 @@
 using System.IO.Compression;
 using Voltray.Core;
+using Voltray.Ipc;
 using static Voltray.Interop.Win32;
 
 namespace Voltray.Tray;
-
-public enum IconStyle { Percentage, Glyph }
 
 /// Draws tray icons. Text and glyphs are rendered large with GDI grayscale antialiasing, cropped
 /// to their ink box and area-resampled into the target size, so they fill the icon at any DPI.

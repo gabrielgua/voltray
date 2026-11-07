@@ -1,5 +1,6 @@
 using Microsoft.Win32;
 using Voltray.Core;
+using Voltray.Ipc;
 using static Voltray.Interop.Win32;
 
 namespace Voltray.Tray;
@@ -51,7 +52,7 @@ internal sealed unsafe class TrayManager(nint hwnd, uint callbackMessage)
 
     public void Update(IReadOnlyList<DeviceState> devices, Settings settings)
     {
-        var groups = devices.GroupBy(d => d.Info.Category)
+        var groups = devices.Where(d => !settings.HiddenDevices.Contains(d.Info.Id)).GroupBy(d => d.Info.Category)
             .Where(g => !settings.HiddenCategories.Contains(g.Key))
             .ToDictionary(g => g.Key, g => g.ToList());
 

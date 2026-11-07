@@ -57,6 +57,11 @@ internal static unsafe partial class Win32
     [LibraryImport("user32.dll")] public static partial int TrackPopupMenu(nint m, uint f, int x, int y, int r, nint h, nint rect);
     [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static partial bool DestroyMenu(nint m);
     [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static partial bool SetForegroundWindow(nint h);
+    [LibraryImport("user32.dll", EntryPoint = "FindWindowW", StringMarshalling = StringMarshalling.Utf16)] public static partial nint FindWindow(string? cls, string? title);
+    [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static partial bool ShowWindow(nint h, int cmd);
+    [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static partial bool IsIconic(nint h);
+    [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static partial bool SetMenuDefaultItem(nint m, uint item, uint byPos);
+    public const int SW_RESTORE = 9;
     [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static partial bool GetCursorPos(out POINT p);
     [LibraryImport("user32.dll")] public static partial uint GetDpiForSystem();
     [LibraryImport("user32.dll")] public static partial int GetSystemMetricsForDpi(int idx, uint dpi);

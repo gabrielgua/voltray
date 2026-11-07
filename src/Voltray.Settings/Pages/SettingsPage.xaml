@@ -1,0 +1,104 @@
+<UserControl
+    x:Class="Voltray.Settings.Pages.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ScrollViewer>
+        <StackPanel MaxWidth="1000" Padding="32,24,32,32" Spacing="4">
+            <TextBlock Text="Configurações" Style="{StaticResource TitleTextBlockStyle}" />
+
+            <TextBlock Text="Bandeja do sistema" Style="{StaticResource SectionHeaderStyle}" />
+
+            <Border Style="{StaticResource CardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE790;" Style="{StaticResource CardIconStyle}" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Estilo do ícone" />
+                        <TextBlock Text="Como o nível de bateria aparece ao lado do relógio" Style="{StaticResource SecondaryTextStyle}" />
+                    </StackPanel>
+                    <ComboBox x:Name="IconStyleBox" Grid.Column="2" MinWidth="200" VerticalAlignment="Center" SelectionChanged="OnIconStyleChanged"
+                              AutomationProperties.Name="Estilo do ícone">
+                        <ComboBoxItem Content="Porcentagem" />
+                        <ComboBoxItem Content="Símbolo da categoria" />
+                    </ComboBox>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource CardStyle}">
+                <Grid RowSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <FontIcon Glyph="&#xE8FD;" Style="{StaticResource CardIconStyle}" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="Categorias na bandeja" />
+                        <TextBlock Text="Cada categoria tem seu próprio ícone. Dispositivos podem ser ocultados um a um na página Dispositivos." Style="{StaticResource SecondaryTextStyle}" />
+                    </StackPanel>
+                    <VariableSizedWrapGrid x:Name="CategoryChecks" Grid.Row="1" Grid.Column="1" Orientation="Horizontal" ItemWidth="150" />
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource CardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE718;" Style="{StaticResource CardIconStyle}" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Fixar ícones na barra de tarefas" />
+                        <TextBlock Text="Ícones novos ficam na área oculta (^). Quem decide quais aparecem é você, nas configurações do Windows: cada categoria do Voltray aparece lá separadamente." Style="{StaticResource SecondaryTextStyle}" />
+                    </StackPanel>
+                    <HyperlinkButton Grid.Column="2" Content="Abrir configurações da barra de tarefas" NavigateUri="ms-settings:taskbar" VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
+            <TextBlock Text="Comportamento" Style="{StaticResource SectionHeaderStyle}" />
+
+            <Border Style="{StaticResource CardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE7E8;" Style="{StaticResource CardIconStyle}" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Iniciar com o Windows" />
+                        <TextBlock Text="Abre o Voltray em segundo plano quando você entra no Windows" Style="{StaticResource SecondaryTextStyle}" />
+                    </StackPanel>
+                    <ToggleSwitch x:Name="AutostartSwitch" Grid.Column="2" MinWidth="0" OnContent="Ativado" OffContent="Desativado" Toggled="OnAutostartToggled"
+                                  AutomationProperties.Name="Iniciar com o Windows" />
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource CardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE895;" Style="{StaticResource CardIconStyle}" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Intervalo de atualização" />
+                        <TextBlock Text="Dispositivos que avisam mudanças de bateria são atualizados na hora; os demais, neste intervalo" Style="{StaticResource SecondaryTextStyle}" />
+                    </StackPanel>
+                    <ComboBox x:Name="IntervalBox" Grid.Column="2" MinWidth="200" VerticalAlignment="Center" SelectionChanged="OnIntervalChanged"
+                              AutomationProperties.Name="Intervalo de atualização" />
+                </Grid>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

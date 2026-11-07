@@ -8,10 +8,12 @@
     <PublishAot>true</PublishAot>
     <OptimizationPreference>Size</OptimizationPreference>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\..\assets\voltray.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Voltray.Core\Voltray.Core.csproj" />
+    <ProjectReference Include="..\Voltray.Ipc\Voltray.Ipc.csproj" />
     <ProjectReference Include="..\Voltray.Providers.Logitech\Voltray.Providers.Logitech.csproj" />
     <ProjectReference Include="..\Voltray.Providers.Bluetooth\Voltray.Providers.Bluetooth.csproj" />
   </ItemGroup>

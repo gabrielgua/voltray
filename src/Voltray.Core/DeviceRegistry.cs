@@ -6,6 +6,7 @@ public sealed class DeviceRegistry : IDeviceSink
 {
     readonly Lock _lock = new();
     readonly Dictionary<string, DeviceState> _devices = new();
+    readonly Dictionary<string, DeviceInfo> _reported = new(); // as the provider (+ classifier) saw it, before overrides
     readonly Dictionary<string, DeviceCategory> _categoryOverrides = new();
 
     /// Raised after any change, on the thread that made it.
@@ -16,28 +17,32 @@ public sealed class DeviceRegistry : IDeviceSink
         lock (_lock) return [.. _devices.Values];
     }
 
-    /// User-chosen category; survives provider re-reports.
-    public void OverrideCategory(string deviceId, DeviceCategory category)
+    /// User-chosen category, or null to go back to automatic. Survives provider re-reports.
+    public void OverrideCategory(string deviceId, DeviceCategory? category)
     {
         lock (_lock)
         {
-            _categoryOverrides[deviceId] = category;
-            if (_devices.TryGetValue(deviceId, out var s))
-                _devices[deviceId] = s with { Info = s.Info with { Category = category, CategoryConfidence = Confidence.User } };
+            if (category is DeviceCategory c) _categoryOverrides[deviceId] = c;
+            else _categoryOverrides.Remove(deviceId);
+            if (_devices.TryGetValue(deviceId, out var s) && _reported.TryGetValue(deviceId, out var reported))
+                _devices[deviceId] = s with { Info = Effective(reported) };
         }
         Changed?.Invoke();
     }
+
+    DeviceInfo Effective(DeviceInfo reported) =>
+        _categoryOverrides.TryGetValue(reported.Id, out var c) ? reported with { Category = c, CategoryConfidence = Confidence.User } : reported;
 
     public void Upsert(DeviceInfo device)
     {
         device = DeviceClassifier.Refine(device);
         lock (_lock)
         {
-            if (_categoryOverrides.TryGetValue(device.Id, out var c))
-                device = device with { Category = c, CategoryConfidence = Confidence.User };
+            _reported[device.Id] = device;
+            var info = Effective(device);
             _devices[device.Id] = _devices.TryGetValue(device.Id, out var s)
-                ? s with { Info = device, Connected = true }
-                : new DeviceState(device, null, true);
+                ? s with { Info = info, Connected = true }
+                : new DeviceState(info, null, true);
         }
         Changed?.Invoke();
     }

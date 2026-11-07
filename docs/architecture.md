@@ -17,9 +17,9 @@
 │                               │                                              │
 │                         Settings (JSON)                                      │
 └───────────────────────────────┬──────────────────────────────────────────────┘
-                                │ named pipe (planned)
+                                │ named pipe Voltray.<user>.<session>
 ┌───────────────────────────────┴──────────────────────────────────────────────┐
-│ Voltray.Settings.exe (planned): WinUI 3, started on demand, exits on close   │
+│ Voltray.Settings.exe: WinUI 3, started on demand, exits on close             │
 │ Dashboard · Settings · About                                                 │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -35,7 +35,9 @@ Why two processes: in [phase 0](phase0.md), a NativeAOT WinUI 3 window cost ~107
 | `DeviceClassifier` | Fallback category guess from the device name. It runs only when the provider could not report a category. |
 | `TrayManager` | One `Shell_NotifyIcon` per category with a **fixed GUID**, so Windows remembers each icon's visibility. Renders icons at the current DPI, builds tooltips (≤127 chars) and recreates icons after Explorer restarts. |
 | `IconRenderer` | GDI grayscale-AA text and glyphs, cropped and resampled to 16–32 px. Has two styles: percentage, or category glyph with a level bar. |
-| `Settings` | `%AppData%\Voltray\settings.json`, using source-generated `System.Text.Json`. |
+| `Settings` (Voltray.Ipc) | `%AppData%\Voltray\settings.json`, using source-generated `System.Text.Json`. Only the host writes it. |
+| `IpcServer` / `HostConnection` | Newline-delimited JSON `Message`s over a named pipe restricted to the current user. The window sends `Subscribe`, `SetSettings`, `SetCategory` and `Refresh`. The host answers with a full `State` after every change. Commands are applied on the host's UI thread. |
+| `Autostart` | Per-user `HKCU\…\Run` entry. The registry is the source of truth, and the entry is repaired if the exe moves. |
 | `Log` | `%LocalAppData%\Voltray\voltray.log`. |
 
 ## Category classification (in priority order)
@@ -51,6 +53,12 @@ Why two processes: in [phase 0](phase0.md), a NativeAOT WinUI 3 window cost ~107
 - **Standard tooltip:** plain text, max 128 chars, `\n` line breaks. Rich hover content would need a custom popup via `NIN_POPUPOPEN` (planned).
 - Icons are 16 px at 100 % scale (20/24/32 px at higher scales). Two digits are the readable maximum, so 100 % is shown as "F".
 - `TaskbarCreated` is broadcast when Explorer restarts. Every icon must be re-added.
+
+## Settings window
+
+- Opened by a left click on any tray icon, or the default "Abrir Voltray" menu item. If it is already open, it is brought forward (found by window class and title). A second launch of either exe does the same.
+- Pages: **Dispositivos** (cards grouped by category, updated in place so toggles keep focus), **Configurações**, **Sobre**.
+- Measured: ~0.3–0.4 s to the first frame, ~116 MB while open, and all of it returned when the window closes, because the process exits.
 
 ## Threading
 

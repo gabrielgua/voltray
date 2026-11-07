@@ -4,18 +4,23 @@
 
 Voltray shows the battery of your mouse, keyboard, headphones, earbuds and controllers next to the Windows clock, with one icon per device category. It is a small native background app with no vendor software required.
 
-> **Status: early development (v0.1.0-dev).** Logitech HID++ works and is tested on hardware. Bluetooth support is implemented but not yet verified with a real device ([help wanted](#device-support)). The settings window is next. See the [roadmap](#roadmap).
+> **Status: early development (v0.1.0-dev).** Logitech HID++ works and is tested on hardware. Bluetooth support is implemented but not yet verified with a real device ([help wanted](#device-support)). See the [roadmap](#roadmap).
 
 ![Tray icons in both styles, at 16–32 px, on dark and light taskbars](docs/images/tray-icons.png)
+
+| Devices | Settings |
+|---|---|
+| ![Devices page](docs/images/window-devices.png) | ![Settings page](docs/images/window-settings.png) |
 
 ## Features
 
 - **One icon per category** (mouse, keyboard, headphones, earbuds, controller, other). Two mice share the mouse icon, and the icon shows the lowest battery in the group.
 - **Two icon styles:** the battery percentage, or the category symbol with a level bar. Colors change for low, critical and charging.
-- **Hover** shows every device in the category with its level. **Click** opens a menu with the same list and the options.
+- **Hover** shows every device in the category with its level. **Left click** opens the Voltray window; **right click** opens a quick menu.
+- **Settings window** (Windows 11 style, light/dark, Mica): every device with its level, connection state and source; per-device "show in tray"; manual category override; icon style; categories; start with Windows; refresh interval.
 - **Hide categories** you do not care about.
 - **Coexists with vendor software.** Logitech devices are read directly over HID++, with or without G HUB running.
-- **Tiny footprint:** ~3 MB single executable, ~5 MB private memory, ~0 % CPU when idle.
+- **Tiny footprint in the background:** ~5 MB executable, ~9 MB private memory, ~0 % CPU when idle. The settings window is a separate process that exits when closed.
 
 ## Device support
 
@@ -35,13 +40,16 @@ Your device is not detected? Run `HidppProbe.exe --list` (Logitech) or `Bluetoot
 
 ## Install
 
-There is no release yet. Build from source:
+There is no release yet. CI builds a ready-to-run folder on every push (Actions → latest run → **Voltray-win-x64**), or build from source:
 
 ```bash
 git clone https://github.com/gabrielgua/voltray
 cd voltray
 dotnet publish src/Voltray -c Release -r win-x64 -o artifacts/publish/Voltray
+dotnet publish src/Voltray.Settings -c Release -o artifacts/publish/Voltray/settings
 ```
+
+Run `artifacts/publish/Voltray/Voltray.exe`. The `settings` folder must stay next to it.
 
 Requirements: Windows 10 2004 (19041)+ or Windows 11, the [.NET 10 SDK](https://dotnet.microsoft.com/download), and the Visual Studio C++ build tools (for NativeAOT).
 
@@ -57,14 +65,14 @@ Voltray.exe (background, Win32 + NativeAOT, ~5 MB)
  ├─ DeviceRegistry ── classification, user overrides, last-known state
  └─ TrayManager ── one icon per category, tooltips, menus
 
-Voltray.Settings.exe (planned, WinUI 3, started on demand, exits when closed)
+Voltray.Settings.exe (WinUI 3, started on demand, exits when closed) ◄── named pipe ──► Voltray.exe
 ```
 
-The settings UI runs as a separate process because WinUI 3 keeps ~100 MB in memory after its window closes. See [docs/architecture.md](docs/architecture.md) and the [phase 0 measurements](docs/phase0.md).
+The settings window runs as a separate process because WinUI 3 keeps ~100 MB in memory after its window closes. See [docs/architecture.md](docs/architecture.md) and the [phase 0 measurements](docs/phase0.md).
 
 ## Roadmap
 
-- **v0.1:** Logitech HID++ ✅, Bluetooth HFP + BLE battery 🧪, low-battery notifications, start with Windows, settings window (dashboard, settings, about), releases on GitHub.
+- **v0.1:** Logitech HID++ ✅, Bluetooth HFP + BLE battery 🧪, settings window ✅, start with Windows ✅, low-battery notifications, releases on GitHub.
 - **v0.2:** Xbox / GameInput, DualSense, 7-day history, device nicknames, diagnostics export.
 - **v0.3:** Razer, SteelSeries, HyperX, Corsair providers.
 - **Later:** rich hover cards, winget, code signing, localization (en / pt-BR), external provider plugins.

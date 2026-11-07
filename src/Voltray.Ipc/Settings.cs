@@ -1,18 +1,23 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Voltray.Core;
-using Voltray.Tray;
 
-namespace Voltray;
+namespace Voltray.Ipc;
+
+public enum IconStyle { Percentage, Glyph }
 
 /// User preferences, stored as JSON in %AppData%\Voltray\settings.json.
+/// Only the tray host writes this file; the settings window changes it through IPC.
 public sealed class Settings
 {
     public int Version { get; set; } = 1;
     public IconStyle IconStyle { get; set; } = IconStyle.Percentage;
     public int RefreshMinutes { get; set; } = 5;
     public HashSet<DeviceCategory> HiddenCategories { get; set; } = [];
+    /// Devices the user removed from the tray (still listed in the settings window).
+    public HashSet<string> HiddenDevices { get; set; } = [];
     public Dictionary<string, DeviceCategory> CategoryOverrides { get; set; } = [];
+    /// Mirrors the HKCU Run entry; the registry is the source of truth.
+    public bool StartWithWindows { get; set; }
 
     static string FilePath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Voltray", "settings.json");
 
@@ -21,7 +26,7 @@ public sealed class Settings
         try
         {
             if (File.Exists(FilePath))
-                return JsonSerializer.Deserialize(File.ReadAllText(FilePath), SettingsJson.Default.Settings) ?? new();
+                return JsonSerializer.Deserialize(File.ReadAllText(FilePath), IpcJson.Default.Settings) ?? new();
         }
         catch (Exception e) when (e is IOException or JsonException) { } // corrupt or locked: fall back to defaults
         return new();
@@ -30,10 +35,8 @@ public sealed class Settings
     public void Save()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        File.WriteAllText(FilePath, JsonSerializer.Serialize(this, SettingsJson.Default.Settings));
+        File.WriteAllText(FilePath, JsonSerializer.Serialize(this, IpcJson.Default.Settings));
     }
-}
 
-[JsonSourceGenerationOptions(WriteIndented = true, UseStringEnumConverter = true)]
-[JsonSerializable(typeof(Settings))]
-internal sealed partial class SettingsJson : JsonSerializerContext;
+    public Settings Clone() => JsonSerializer.Deserialize(JsonSerializer.Serialize(this, IpcJson.Default.Settings), IpcJson.Default.Settings)!;
+}

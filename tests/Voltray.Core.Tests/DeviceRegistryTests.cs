@@ -33,6 +33,20 @@ public class DeviceRegistryTests
     }
 
     [Fact]
+    public void Clearing_an_override_restores_the_reported_category()
+    {
+        var r = new DeviceRegistry();
+        r.Upsert(Mouse());
+        r.OverrideCategory("m1", DeviceCategory.Keyboard);
+        Assert.Equal(DeviceCategory.Keyboard, r.Snapshot()[0].Info.Category);
+
+        r.OverrideCategory("m1", null);
+        var info = r.Snapshot()[0].Info;
+        Assert.Equal(DeviceCategory.Mouse, info.Category);
+        Assert.Equal(Confidence.Reported, info.CategoryConfidence);
+    }
+
+    [Fact]
     public void Readings_for_unknown_devices_are_ignored()
     {
         var r = new DeviceRegistry();
