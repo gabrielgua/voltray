@@ -1,0 +1,39 @@
+name: Device not detected / device support
+description: A device with a battery does not show up, or shows wrong data.
+labels: [device-support]
+body:
+  - type: input
+    id: model
+    attributes:
+      label: Device model
+      placeholder: e.g. Logitech G Pro X Superlight 2
+    validations:
+      required: true
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Connection
+      options:
+        - Vendor USB receiver (LIGHTSPEED, HyperSpeed, ...)
+        - Bluetooth
+        - USB cable
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: vendor-app
+    attributes:
+      label: Does the vendor's own app show the battery?
+      options: ["Yes", "No", "I don't use it"]
+  - type: textarea
+    id: probe
+    attributes:
+      label: Probe output
+      description: For Logitech, run `HidppProbe.exe --list` and paste the output.
+      render: text
+  - type: textarea
+    id: log
+    attributes:
+      label: Voltray log
+      description: Relevant lines from `%LocalAppData%\Voltray\voltray.log`.
+      render: text

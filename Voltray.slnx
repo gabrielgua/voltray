@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Voltray.Core/Voltray.Core.csproj" />
+    <Project Path="src/Voltray.Platform/Voltray.Platform.csproj" />
+    <Project Path="src/Voltray.Providers.Logitech/Voltray.Providers.Logitech.csproj" />
+    <Project Path="src/Voltray/Voltray.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Voltray.Core.Tests/Voltray.Core.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/HidppProbe/HidppProbe.csproj" />
+  </Folder>
+</Solution>

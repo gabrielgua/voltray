@@ -1,0 +1,26 @@
+name: Bug report
+description: Something in Voltray does not work as expected.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+  - type: input
+    id: version
+    attributes:
+      label: Voltray version and Windows build
+      placeholder: e.g. 0.1.0, Windows 11 26100
+  - type: textarea
+    id: log
+    attributes:
+      label: Voltray log
+      description: Relevant lines from `%LocalAppData%\Voltray\voltray.log`.
+      render: text

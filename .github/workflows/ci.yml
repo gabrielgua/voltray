@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build
+        run: dotnet build -c Release
+
+      - name: Test
+        run: dotnet test -c Release --no-build
+
+      - name: Publish (NativeAOT)
+        run: dotnet publish src/Voltray -c Release -r win-x64 -o artifacts/publish/Voltray
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Voltray-win-x64
+          path: artifacts/publish/Voltray/Voltray.exe

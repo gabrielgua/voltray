@@ -1,0 +1,8 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Voltray.Core\Voltray.Core.csproj" />
+    <ProjectReference Include="..\Voltray.Platform\Voltray.Platform.csproj" />
+  </ItemGroup>
+
+</Project>

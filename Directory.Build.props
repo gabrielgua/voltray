@@ -1,0 +1,21 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+
+    <Version>0.1.0-dev</Version>
+    <Authors>Gabriel Guaita</Authors>
+    <Product>Voltray</Product>
+    <Copyright>Copyright (c) 2026 Gabriel Guaita</Copyright>
+    <RepositoryUrl>https://github.com/gabrielgua/voltray</RepositoryUrl>
+  </PropertyGroup>
+
+  <!-- Libraries must stay trimmable: the tray host ships as a NativeAOT single exe. -->
+  <PropertyGroup Condition="'$(OutputType)' == 'Library' and '$(IsTestProject)' != 'true'">
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+</Project>
