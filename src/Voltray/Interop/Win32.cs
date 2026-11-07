@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 
 namespace Voltray.Interop;
 
@@ -7,7 +7,9 @@ internal static unsafe partial class Win32
     public const uint WM_DESTROY = 0x0002, WM_COMMAND = 0x0111, WM_TIMER = 0x0113, WM_SETTINGCHANGE = 0x001A,
         WM_DPICHANGED = 0x02E0, WM_CONTEXTMENU = 0x007B, WM_LBUTTONUP = 0x0202, WM_APP = 0x8000,
         NIN_SELECT = 0x0400, NIN_KEYSELECT = 0x0401;
-    public const uint NIF_MESSAGE = 0x1, NIF_ICON = 0x2, NIF_TIP = 0x4, NIF_GUID = 0x20, NIF_SHOWTIP = 0x80;
+    public const uint NIF_MESSAGE = 0x1, NIF_ICON = 0x2, NIF_TIP = 0x4, NIF_INFO = 0x10, NIF_GUID = 0x20, NIF_SHOWTIP = 0x80;
+    public const uint NIIF_INFO = 0x1, NIIF_WARNING = 0x2, NIIF_ERROR = 0x3, NIIF_RESPECT_QUIET_TIME = 0x80;
+    public const uint NIN_BALLOONUSERCLICK = 0x0405;
     public const uint NIM_ADD = 0, NIM_MODIFY = 1, NIM_DELETE = 2, NIM_SETVERSION = 4, NOTIFYICON_VERSION_4 = 4;
     public const uint MF_STRING = 0, MF_GRAYED = 1, MF_CHECKED = 0x8, MF_POPUP = 0x10, MF_SEPARATOR = 0x800, TPM_RIGHTBUTTON = 0x2, TPM_RETURNCMD = 0x100;
     public const int SM_CXSMICON = 49;

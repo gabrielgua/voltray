@@ -28,6 +28,7 @@ internal static class Program
     static readonly DeviceRegistry Registry = new();
     static readonly List<IBatteryProvider> Providers = [new LogitechProvider(), new BluetoothProvider()];
     static readonly ConcurrentQueue<Action> UiQueue = new();
+    static readonly BatteryAlerts Alerts = new();
     static TrayManager? _tray;
     static IpcServer? _ipc;
     static volatile StateDto _state = new("", [], new());
@@ -117,7 +118,7 @@ internal static class Program
             .OrderBy(d => d.Info.Category).ThenBy(d => d.Info.Name, StringComparer.CurrentCultureIgnoreCase)
             .Select(d => new DeviceDto(d.Info.Id, d.Info.Name, d.Info.Manufacturer, d.Info.Category, d.Info.CategoryConfidence, d.Connected,
                 d.Battery?.Percent, d.Battery?.Level ?? BatteryLevel.Unknown, d.Battery?.Charge ?? ChargeState.Unknown,
-                d.Battery?.Source, d.Battery?.Timestamp, !_settings.HiddenDevices.Contains(d.Info.Id)))
+                d.Battery?.Source, d.Battery?.Timestamp, !_settings.HiddenDevices.Contains(d.Info.Id), !_settings.MutedDevices.Contains(d.Info.Id)))
             .ToList();
         return new StateDto(Version, devices, _settings.Clone());
     }
@@ -125,9 +126,26 @@ internal static class Program
     /// Repaints the tray and pushes the new state to open settings windows. UI thread only.
     static void StateChanged()
     {
-        _tray?.Update(Registry.Snapshot(), _settings);
+        var devices = Registry.Snapshot();
+        _tray?.Update(devices, _settings);
         _state = BuildState();
         _ipc?.Broadcast(_state);
+        NotifyAlerts(devices);
+    }
+
+    static void NotifyAlerts(IReadOnlyList<DeviceState> devices)
+    {
+        var options = new AlertOptions(_settings.NotifyLowBattery, _settings.LowBatteryThreshold, _settings.NotifyCharged, _settings.MutedDevices);
+        foreach (var a in Alerts.Evaluate(devices, options))
+        {
+            var (title, text) = a.Kind switch
+            {
+                AlertKind.Critical => ($"Bateria crítica: {a.DeviceName}", $"{a.Percent}% restantes. Conecte o carregador logo."),
+                AlertKind.Low => ($"Bateria baixa: {a.DeviceName}", $"{a.Percent}% restantes."),
+                _ => ($"Carga completa: {a.DeviceName}", "Pode desconectar o carregador."),
+            };
+            _tray?.Notify(a.Category, title, text, warning: a.Kind != AlertKind.Charged);
+        }
     }
 
     static void HandleCommand(Message m)
@@ -151,6 +169,10 @@ internal static class Program
             case MessageType.Refresh:
                 _ = Task.Run(RefreshAsync);
                 break;
+            case MessageType.TestNotification:
+                _tray?.Notify(DeviceCategory.Mouse, "Bateria baixa: dispositivo de teste",
+                    $"{_settings.LowBatteryThreshold}% restantes. É assim que os avisos do Voltray aparecem.", warning: true);
+                break;
         }
     }
 
@@ -164,7 +186,7 @@ internal static class Program
             if (_tray.TryGetCategory(msg, out var category))
             {
                 uint ev = (uint)(lParam & 0xFFFF);
-                if (ev is NIN_SELECT or NIN_KEYSELECT) OpenSettingsWindow(); // left click / Enter: primary action
+                if (ev is NIN_SELECT or NIN_KEYSELECT or NIN_BALLOONUSERCLICK) OpenSettingsWindow(); // left click / Enter / notification click
                 else if (ev == WM_CONTEXTMENU) ShowMenu(category, (short)(wParam & 0xFFFF), (short)((wParam >> 16) & 0xFFFF));
                 return 0;
             }

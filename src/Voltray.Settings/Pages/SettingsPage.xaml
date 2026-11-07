@@ -64,6 +64,75 @@
                 </Grid>
             </Border>
 
+            <TextBlock Text="Notificações" Style="{StaticResource SectionHeaderStyle}" />
+
+            <Border Style="{StaticResource CardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xEA8F;" Style="{StaticResource CardIconStyle}" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Avisar quando a bateria estiver baixa" />
+                        <TextBlock Text="Um aviso ao atingir o limite e outro em 10%. Não avisa enquanto o dispositivo carrega." Style="{StaticResource SecondaryTextStyle}" />
+                    </StackPanel>
+                    <ToggleSwitch x:Name="NotifyLowSwitch" Grid.Column="2" MinWidth="0" OnContent="Ativado" OffContent="Desativado" Toggled="OnNotifyLowToggled"
+                                  AutomationProperties.Name="Avisar quando a bateria estiver baixa" />
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource CardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xEBA0;" Style="{StaticResource CardIconStyle}" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Limite de bateria baixa" />
+                        <TextBlock Text="Nível em que o primeiro aviso aparece" Style="{StaticResource SecondaryTextStyle}" />
+                    </StackPanel>
+                    <ComboBox x:Name="ThresholdBox" Grid.Column="2" MinWidth="200" VerticalAlignment="Center" SelectionChanged="OnThresholdChanged"
+                              AutomationProperties.Name="Limite de bateria baixa" />
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource CardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE83E;" Style="{StaticResource CardIconStyle}" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Avisar quando terminar de carregar" />
+                        <TextBlock Text="Para dispositivos que informam o estado de carga" Style="{StaticResource SecondaryTextStyle}" />
+                    </StackPanel>
+                    <ToggleSwitch x:Name="NotifyChargedSwitch" Grid.Column="2" MinWidth="0" OnContent="Ativado" OffContent="Desativado" Toggled="OnNotifyChargedToggled"
+                                  AutomationProperties.Name="Avisar quando terminar de carregar" />
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource CardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE7E7;" Style="{StaticResource CardIconStyle}" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Testar notificação" />
+                        <TextBlock Text="Se nada aparecer, confira se as notificações e o modo Não incomodar do Windows permitem avisos do Voltray. Avisos por dispositivo ficam no menu ⋯ de cada um." Style="{StaticResource SecondaryTextStyle}" />
+                    </StackPanel>
+                    <Button Grid.Column="2" Content="Enviar teste" Click="OnTestNotificationClick" VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
             <TextBlock Text="Comportamento" Style="{StaticResource SectionHeaderStyle}" />
 
             <Border Style="{StaticResource CardStyle}">

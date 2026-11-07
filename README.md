@@ -8,9 +8,9 @@ Voltray shows the battery of your mouse, keyboard, headphones, earbuds and contr
 
 ![Tray icons in both styles, at 16–32 px, on dark and light taskbars](docs/images/tray-icons.png)
 
-| Devices | Settings |
-|---|---|
-| ![Devices page](docs/images/window-devices.png) | ![Settings page](docs/images/window-settings.png) |
+| Devices | Settings | Notifications |
+|---|---|---|
+| ![Devices page](docs/images/window-devices.png) | ![Settings page](docs/images/window-settings.png) | ![Notification settings](docs/images/window-notifications.png) |
 
 ## Features
 
@@ -18,6 +18,7 @@ Voltray shows the battery of your mouse, keyboard, headphones, earbuds and contr
 - **Two icon styles:** the battery percentage, or the category symbol with a level bar. Colors change for low, critical and charging.
 - **Hover** shows every device in the category with its level. **Left click** opens the Voltray window; **right click** opens a quick menu.
 - **Settings window** (Windows 11 style, light/dark, Mica): every device with its level, connection state and source; per-device "show in tray"; manual category override; icon style; categories; start with Windows; refresh interval.
+- **Low-battery notifications:** one warning at your threshold (default 20 %) and a last one at 10 %. Never while charging, never twice for the same drop. Optionally, a notice when charging completes. Each device can be muted. Windows Do Not Disturb, including the automatic mode during full-screen games, is respected.
 - **Hide categories** you do not care about.
 - **Coexists with vendor software.** Logitech devices are read directly over HID++, with or without G HUB running.
 - **Tiny footprint in the background:** ~5 MB executable, ~9 MB private memory, ~0 % CPU when idle. The settings window is a separate process that exits when closed.
@@ -72,7 +73,7 @@ The settings window runs as a separate process because WinUI 3 keeps ~100 MB in 
 
 ## Roadmap
 
-- **v0.1:** Logitech HID++ ✅, Bluetooth HFP + BLE battery 🧪, settings window ✅, start with Windows ✅, low-battery notifications, releases on GitHub.
+- **v0.1:** Logitech HID++ ✅, Bluetooth HFP + BLE battery 🧪, settings window ✅, start with Windows ✅, low-battery notifications ✅, releases on GitHub.
 - **v0.2:** Xbox / GameInput, DualSense, 7-day history, device nicknames, diagnostics export.
 - **v0.3:** Razer, SteelSeries, HyperX, Corsair providers.
 - **Later:** rich hover cards, winget, code signing, localization (en / pt-BR), external provider plugins.

@@ -16,7 +16,8 @@ public sealed record DeviceDto(
     ChargeState Charge,
     string? Source,
     DateTimeOffset? UpdatedAt,
-    bool ShownInTray);
+    bool ShownInTray,
+    bool Notify);
 
 public sealed record StateDto(string Version, List<DeviceDto> Devices, Settings Settings);
 
@@ -32,6 +33,8 @@ public enum MessageType
     SetCategory,
     /// Window → host: poll every provider now.
     Refresh,
+    /// Window → host: show a sample low-battery notification.
+    TestNotification,
 }
 
 /// Newline-delimited JSON over a named pipe. One envelope type keeps the protocol trivially AOT-safe.

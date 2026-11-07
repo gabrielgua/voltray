@@ -26,6 +26,7 @@ public sealed partial class DeviceViewModel : INotifyPropertyChanged
     public string Id => _dto.Id;
     public DeviceCategory Category => _dto.Category;
     public bool IsCategoryAutomatic => _dto.CategoryConfidence != Confidence.User;
+    public bool Notify => _dto.Notify;
     public string Name => _dto.Name;
     public string Glyph => Categories.Glyph(_dto.Category);
 

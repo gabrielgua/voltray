@@ -113,6 +113,23 @@ internal sealed unsafe class TrayManager(nint hwnd, uint callbackMessage)
         _shown.Remove(category);
     }
 
+    /// Shows a notification from the category's icon (any shown icon if that one is hidden).
+    /// Windows 10/11 turn this into a regular toast; NIIF_RESPECT_QUIET_TIME lets Do Not Disturb
+    /// (including the automatic one during full-screen games) hold it back.
+    public bool Notify(DeviceCategory preferred, string title, string text, bool warning)
+    {
+        if (_shown.Count == 0) return false;
+        var category = _shown.ContainsKey(preferred) ? preferred : _shown.Keys.First();
+        var nid = Data(category);
+        nid.uFlags |= NIF_INFO;
+        nid.dwInfoFlags = (warning ? NIIF_WARNING : NIIF_INFO) | NIIF_RESPECT_QUIET_TIME;
+        title.AsSpan(0, Math.Min(title.Length, 63)).CopyTo(new Span<char>(nid.szInfoTitle, 64));
+        text.AsSpan(0, Math.Min(text.Length, 255)).CopyTo(new Span<char>(nid.szInfo, 256));
+        bool ok = Shell_NotifyIcon(NIM_MODIFY, ref nid);
+        Log.Info($"notification {(ok ? "shown" : "FAILED")}: {title} — {text}");
+        return ok;
+    }
+
     public void RemoveAll()
     {
         foreach (var c in _shown.Keys.ToList()) Remove(c);

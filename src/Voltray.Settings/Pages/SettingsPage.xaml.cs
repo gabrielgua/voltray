@@ -9,6 +9,7 @@ namespace Voltray.Settings.Pages;
 public sealed partial class SettingsPage : UserControl
 {
     static readonly int[] Intervals = [1, 5, 15, 30];
+    static readonly int[] Thresholds = [10, 15, 20, 25, 30, 40];
 
     readonly Dictionary<DeviceCategory, CheckBox> _categoryChecks = new();
     bool _applying; // true while copying host state into the controls, so their events don't echo it back
@@ -24,6 +25,7 @@ public sealed partial class SettingsPage : UserControl
             CategoryChecks.Children.Add(box);
         }
         foreach (var m in Intervals) IntervalBox.Items.Add(new ComboBoxItem { Content = m == 1 ? "1 minuto" : $"{m} minutos", Tag = m });
+        foreach (var t in Thresholds) ThresholdBox.Items.Add(new ComboBoxItem { Content = $"{t}%", Tag = t });
 
         IsEnabled = App.Host.State != null;
         App.Host.StateReceived += Apply;
@@ -43,6 +45,11 @@ public sealed partial class SettingsPage : UserControl
             AutostartSwitch.IsOn = s.StartWithWindows;
             int i = Array.IndexOf(Intervals, s.RefreshMinutes);
             IntervalBox.SelectedIndex = i >= 0 ? i : 1;
+            NotifyLowSwitch.IsOn = s.NotifyLowBattery;
+            NotifyChargedSwitch.IsOn = s.NotifyCharged;
+            int t = Array.IndexOf(Thresholds, s.LowBatteryThreshold);
+            ThresholdBox.SelectedIndex = t >= 0 ? t : Array.IndexOf(Thresholds, 20);
+            ThresholdBox.IsEnabled = s.NotifyLowBattery;
         }
         finally { _applying = false; }
     }
@@ -67,6 +74,28 @@ public sealed partial class SettingsPage : UserControl
         bool on = AutostartSwitch.IsOn;
         _ = App.Host.ChangeSettingsAsync(s => s.StartWithWindows = on);
     }
+
+    void OnNotifyLowToggled(object sender, RoutedEventArgs e)
+    {
+        if (_applying) return;
+        bool on = NotifyLowSwitch.IsOn;
+        _ = App.Host.ChangeSettingsAsync(s => s.NotifyLowBattery = on);
+    }
+
+    void OnNotifyChargedToggled(object sender, RoutedEventArgs e)
+    {
+        if (_applying) return;
+        bool on = NotifyChargedSwitch.IsOn;
+        _ = App.Host.ChangeSettingsAsync(s => s.NotifyCharged = on);
+    }
+
+    void OnThresholdChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_applying || ThresholdBox.SelectedItem is not ComboBoxItem { Tag: int percent }) return;
+        _ = App.Host.ChangeSettingsAsync(s => s.LowBatteryThreshold = percent);
+    }
+
+    void OnTestNotificationClick(object sender, RoutedEventArgs e) => _ = App.Host.TestNotificationAsync();
 
     void OnIntervalChanged(object sender, SelectionChangedEventArgs e)
     {

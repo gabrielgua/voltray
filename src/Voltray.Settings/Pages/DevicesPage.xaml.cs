@@ -65,7 +65,7 @@ public sealed partial class DevicesPage : UserControl
 
     void OnRefreshClick(object sender, RoutedEventArgs e) => _ = App.Host.RefreshAsync();
 
-    /// "..." menu: change the category (or go back to automatic).
+    /// "..." menu: notifications for this device, and its category (or back to automatic).
     void OnMoreClick(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: DeviceViewModel vm } button) return;
@@ -84,7 +84,14 @@ public sealed partial class DevicesPage : UserControl
             item.Click += (_, _) => _ = App.Host.SetCategoryAsync(vm.Id, c);
             category.Items.Add(item);
         }
+        var notify = new ToggleMenuFlyoutItem { Text = "Notificações de bateria", IsChecked = vm.Notify, Icon = new FontIcon { Glyph = "\uEA8F" } };
+        notify.Click += (_, _) =>
+        {
+            bool on = notify.IsChecked;
+            _ = App.Host.ChangeSettingsAsync(s => { if (on) s.MutedDevices.Remove(vm.Id); else s.MutedDevices.Add(vm.Id); });
+        };
         var menu = new MenuFlyout();
+        menu.Items.Add(notify);
         menu.Items.Add(category);
         menu.ShowAt(button);
     }

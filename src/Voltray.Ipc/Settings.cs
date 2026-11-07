@@ -19,6 +19,12 @@ public sealed class Settings
     /// Mirrors the HKCU Run entry; the registry is the source of truth.
     public bool StartWithWindows { get; set; }
 
+    public bool NotifyLowBattery { get; set; } = true;
+    public int LowBatteryThreshold { get; set; } = 20;
+    public bool NotifyCharged { get; set; }
+    /// Devices the user does not want notifications for.
+    public HashSet<string> MutedDevices { get; set; } = [];
+
     static string FilePath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Voltray", "settings.json");
 
     public static Settings Load()

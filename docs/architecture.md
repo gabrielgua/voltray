@@ -37,6 +37,8 @@ Why two processes: in [phase 0](phase0.md), a NativeAOT WinUI 3 window cost ~107
 | `IconRenderer` | GDI grayscale-AA text and glyphs, cropped and resampled to 16–32 px. Has two styles: percentage, or category glyph with a level bar. |
 | `Settings` (Voltray.Ipc) | `%AppData%\Voltray\settings.json`, using source-generated `System.Text.Json`. Only the host writes it. |
 | `IpcServer` / `HostConnection` | Newline-delimited JSON `Message`s over a named pipe restricted to the current user. The window sends `Subscribe`, `SetSettings`, `SetCategory` and `Refresh`. The host answers with a full `State` after every change. Commands are applied on the host's UI thread. |
+| `BatteryAlerts` (Core) | Pure rules for when to notify: once at the threshold, once at 10 % (if the threshold is higher), re-armed by charging or by rising 5 points above the threshold, never for disconnected or muted devices. Fully unit-tested. |
+| Notifications | `Shell_NotifyIcon` + `NIF_INFO` on the category's icon, which Windows 10/11 show as a regular toast with no app registration (AUMID / Start-menu shortcut) needed. `NIIF_RESPECT_QUIET_TIME` defers to Do Not Disturb. Clicking it (`NIN_BALLOONUSERCLICK`) opens the window. |
 | `Autostart` | Per-user `HKCU\…\Run` entry. The registry is the source of truth, and the entry is repaired if the exe moves. |
 | `Log` | `%LocalAppData%\Voltray\voltray.log`. |
 
