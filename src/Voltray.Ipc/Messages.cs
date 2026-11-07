@@ -33,7 +33,8 @@ public enum MessageType
     SetCategory,
     /// Window → host: poll every provider now.
     Refresh,
-    /// Window → host: show a sample low-battery notification.
+    /// Window → host: show a sample low-battery notification (<see cref="Message.Percent"/> and
+    /// <see cref="Message.Text"/> preview one alert rule).
     TestNotification,
 }
 
@@ -43,7 +44,9 @@ public sealed record Message(
     StateDto? State = null,
     Settings? Settings = null,
     string? DeviceId = null,
-    DeviceCategory? Category = null);
+    DeviceCategory? Category = null,
+    int? Percent = null,
+    string? Text = null);
 
 [JsonSourceGenerationOptions(WriteIndented = false, UseStringEnumConverter = true, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(Message))]

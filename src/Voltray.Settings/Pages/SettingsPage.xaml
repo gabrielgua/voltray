@@ -1,4 +1,4 @@
-<UserControl
+﻿<UserControl
     x:Class="Voltray.Settings.Pages.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
@@ -19,32 +19,15 @@
                     <FontIcon Glyph="&#xE790;" Style="{StaticResource CardIconStyle}" />
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
                         <TextBlock Text="Estilo do ícone" />
-                        <TextBlock Text="Como o nível de bateria aparece ao lado do relógio" Style="{StaticResource SecondaryTextStyle}" />
+                        <TextBlock Text="Como a bateria aparece na bandeja" Style="{StaticResource SecondaryTextStyle}" />
                     </StackPanel>
                     <ComboBox x:Name="IconStyleBox" Grid.Column="2" MinWidth="200" VerticalAlignment="Center" SelectionChanged="OnIconStyleChanged"
                               AutomationProperties.Name="Estilo do ícone">
-                        <ComboBoxItem Content="Porcentagem" />
-                        <ComboBoxItem Content="Símbolo da categoria" />
+                        <ComboBoxItem Content="Barra" Tag="Glyph" />
+                        <ComboBoxItem Content="Barra vertical" Tag="GlyphBarSide" />
+                        <ComboBoxItem Content="Ícone colorido" Tag="GlyphColorSteps" />
+                        <ComboBoxItem Content="Número" Tag="GlyphNumber" />
                     </ComboBox>
-                </Grid>
-            </Border>
-
-            <Border Style="{StaticResource CardStyle}">
-                <Grid RowSpacing="12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <FontIcon Glyph="&#xE8FD;" Style="{StaticResource CardIconStyle}" />
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="Categorias na bandeja" />
-                        <TextBlock Text="Cada categoria tem seu próprio ícone. Dispositivos podem ser ocultados um a um na página Dispositivos." Style="{StaticResource SecondaryTextStyle}" />
-                    </StackPanel>
-                    <VariableSizedWrapGrid x:Name="CategoryChecks" Grid.Row="1" Grid.Column="1" Orientation="Horizontal" ItemWidth="150" />
                 </Grid>
             </Border>
 
@@ -55,12 +38,70 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <FontIcon Glyph="&#xE718;" Style="{StaticResource CardIconStyle}" />
+                    <FontIcon Glyph="&#xE8EF;" Style="{StaticResource CardIconStyle}" />
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                        <TextBlock Text="Fixar ícones na barra de tarefas" />
-                        <TextBlock Text="Ícones novos ficam na área oculta (^). Quem decide quais aparecem é você, nas configurações do Windows: cada categoria do Voltray aparece lá separadamente." Style="{StaticResource SecondaryTextStyle}" />
+                        <TextBlock Text="Mostrar o símbolo %" />
+                        <TextBlock Text="No estilo Número" Style="{StaticResource SecondaryTextStyle}" />
                     </StackPanel>
-                    <HyperlinkButton Grid.Column="2" Content="Abrir configurações da barra de tarefas" NavigateUri="ms-settings:taskbar" VerticalAlignment="Center" />
+                    <ToggleSwitch x:Name="PercentSignSwitch" Grid.Column="2" MinWidth="0" OnContent="Ativado" OffContent="Desativado" Toggled="OnPercentSignToggled"
+                                  AutomationProperties.Name="Mostrar o símbolo %" />
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource CardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE790;" Style="{StaticResource CardIconStyle}" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Colorir o número" />
+                        <TextBlock Text="No estilo Número, com a cor do nível" Style="{StaticResource SecondaryTextStyle}" />
+                    </StackPanel>
+                    <ToggleSwitch x:Name="ColorNumberSwitch" Grid.Column="2" MinWidth="0" OnContent="Ativado" OffContent="Desativado" Toggled="OnColorNumberToggled"
+                                  AutomationProperties.Name="Colorir o número" />
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource CardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE8A9;" Style="{StaticResource CardIconStyle}" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Ícones na bandeja" />
+                        <TextBlock Text="Agrupados por categoria ou um por dispositivo" Style="{StaticResource SecondaryTextStyle}" />
+                    </StackPanel>
+                    <ComboBox x:Name="TrayModeBox" Grid.Column="2" MinWidth="200" VerticalAlignment="Center" SelectionChanged="OnTrayModeChanged"
+                              AutomationProperties.Name="Ícones na bandeja">
+                        <ComboBoxItem Content="Um por categoria" Tag="PerCategory" />
+                        <ComboBoxItem Content="Um por dispositivo" Tag="PerDevice" />
+                    </ComboBox>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource CardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE703;" Style="{StaticResource CardIconStyle}" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Dispositivo desconectado" />
+                        <TextBlock Text="Como ele aparece na bandeja" Style="{StaticResource SecondaryTextStyle}" />
+                    </StackPanel>
+                    <ComboBox x:Name="DisconnectedBox" Grid.Column="2" MinWidth="200" VerticalAlignment="Center" SelectionChanged="OnDisconnectedChanged"
+                              AutomationProperties.Name="Dispositivo desconectado">
+                        <ComboBoxItem Content="Esmaecido" Tag="Dim" />
+                        <ComboBoxItem Content="Ocultar da bandeja" Tag="Hide" />
+                    </ComboBox>
                 </Grid>
             </Border>
 
@@ -76,7 +117,7 @@
                     <FontIcon Glyph="&#xEA8F;" Style="{StaticResource CardIconStyle}" />
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
                         <TextBlock Text="Avisar quando a bateria estiver baixa" />
-                        <TextBlock Text="Um aviso ao atingir o limite e outro em 10%. Não avisa enquanto o dispositivo carrega." Style="{StaticResource SecondaryTextStyle}" />
+                        <TextBlock Text="Nunca enquanto o dispositivo carrega" Style="{StaticResource SecondaryTextStyle}" />
                     </StackPanel>
                     <ToggleSwitch x:Name="NotifyLowSwitch" Grid.Column="2" MinWidth="0" OnContent="Ativado" OffContent="Desativado" Toggled="OnNotifyLowToggled"
                                   AutomationProperties.Name="Avisar quando a bateria estiver baixa" />
@@ -90,13 +131,19 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <FontIcon Glyph="&#xEBA0;" Style="{StaticResource CardIconStyle}" />
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                        <TextBlock Text="Limite de bateria baixa" />
-                        <TextBlock Text="Nível em que o primeiro aviso aparece" Style="{StaticResource SecondaryTextStyle}" />
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <FontIcon Glyph="&#xEBA0;" Style="{StaticResource CardIconStyle}" VerticalAlignment="Top" Margin="0,2,16,0" />
+                    <StackPanel Grid.Column="1" Grid.ColumnSpan="2" Spacing="10">
+                        <StackPanel>
+                            <TextBlock Text="Avisos de bateria baixa" />
+                            <TextBlock Text="Cada um avisa uma vez ao chegar no limite" Style="{StaticResource SecondaryTextStyle}" />
+                        </StackPanel>
+                        <StackPanel x:Name="RuleList" Spacing="8" />
+                        <Button x:Name="AddRuleButton" Content="Adicionar aviso" Click="OnAddRuleClick" />
                     </StackPanel>
-                    <ComboBox x:Name="ThresholdBox" Grid.Column="2" MinWidth="200" VerticalAlignment="Center" SelectionChanged="OnThresholdChanged"
-                              AutomationProperties.Name="Limite de bateria baixa" />
                 </Grid>
             </Border>
 
@@ -110,26 +157,10 @@
                     <FontIcon Glyph="&#xE83E;" Style="{StaticResource CardIconStyle}" />
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
                         <TextBlock Text="Avisar quando terminar de carregar" />
-                        <TextBlock Text="Para dispositivos que informam o estado de carga" Style="{StaticResource SecondaryTextStyle}" />
+                        <TextBlock Text="Se o dispositivo informar a carga" Style="{StaticResource SecondaryTextStyle}" />
                     </StackPanel>
                     <ToggleSwitch x:Name="NotifyChargedSwitch" Grid.Column="2" MinWidth="0" OnContent="Ativado" OffContent="Desativado" Toggled="OnNotifyChargedToggled"
                                   AutomationProperties.Name="Avisar quando terminar de carregar" />
-                </Grid>
-            </Border>
-
-            <Border Style="{StaticResource CardStyle}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <FontIcon Glyph="&#xE7E7;" Style="{StaticResource CardIconStyle}" />
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                        <TextBlock Text="Testar notificação" />
-                        <TextBlock Text="Se nada aparecer, confira se as notificações e o modo Não incomodar do Windows permitem avisos do Voltray. Avisos por dispositivo ficam no menu ⋯ de cada um." Style="{StaticResource SecondaryTextStyle}" />
-                    </StackPanel>
-                    <Button Grid.Column="2" Content="Enviar teste" Click="OnTestNotificationClick" VerticalAlignment="Center" />
                 </Grid>
             </Border>
 
@@ -145,7 +176,7 @@
                     <FontIcon Glyph="&#xE7E8;" Style="{StaticResource CardIconStyle}" />
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
                         <TextBlock Text="Iniciar com o Windows" />
-                        <TextBlock Text="Abre o Voltray em segundo plano quando você entra no Windows" Style="{StaticResource SecondaryTextStyle}" />
+                        <TextBlock Text="Abre em segundo plano" Style="{StaticResource SecondaryTextStyle}" />
                     </StackPanel>
                     <ToggleSwitch x:Name="AutostartSwitch" Grid.Column="2" MinWidth="0" OnContent="Ativado" OffContent="Desativado" Toggled="OnAutostartToggled"
                                   AutomationProperties.Name="Iniciar com o Windows" />
@@ -162,7 +193,7 @@
                     <FontIcon Glyph="&#xE895;" Style="{StaticResource CardIconStyle}" />
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
                         <TextBlock Text="Intervalo de atualização" />
-                        <TextBlock Text="Dispositivos que avisam mudanças de bateria são atualizados na hora; os demais, neste intervalo" Style="{StaticResource SecondaryTextStyle}" />
+                        <TextBlock Text="Para dispositivos que não avisam mudanças" Style="{StaticResource SecondaryTextStyle}" />
                     </StackPanel>
                     <ComboBox x:Name="IntervalBox" Grid.Column="2" MinWidth="200" VerticalAlignment="Center" SelectionChanged="OnIntervalChanged"
                               AutomationProperties.Name="Intervalo de atualização" />

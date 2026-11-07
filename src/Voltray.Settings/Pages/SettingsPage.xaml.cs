@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Voltray.Core;
 using Voltray.Ipc;
@@ -9,23 +10,13 @@ namespace Voltray.Settings.Pages;
 public sealed partial class SettingsPage : UserControl
 {
     static readonly int[] Intervals = [1, 5, 15, 30];
-    static readonly int[] Thresholds = [10, 15, 20, 25, 30, 40];
 
-    readonly Dictionary<DeviceCategory, CheckBox> _categoryChecks = new();
     bool _applying; // true while copying host state into the controls, so their events don't echo it back
 
     public SettingsPage()
     {
         InitializeComponent();
-        foreach (var c in Categories.All)
-        {
-            var box = new CheckBox { Content = Categories.Label(c), Tag = c };
-            box.Click += OnCategoryClick;
-            _categoryChecks[c] = box;
-            CategoryChecks.Children.Add(box);
-        }
         foreach (var m in Intervals) IntervalBox.Items.Add(new ComboBoxItem { Content = m == 1 ? "1 minuto" : $"{m} minutos", Tag = m });
-        foreach (var t in Thresholds) ThresholdBox.Items.Add(new ComboBoxItem { Content = $"{t}%", Tag = t });
 
         IsEnabled = App.Host.State != null;
         App.Host.StateReceived += Apply;
@@ -40,32 +31,43 @@ public sealed partial class SettingsPage : UserControl
         {
             IsEnabled = true;
             var s = state.Settings;
-            IconStyleBox.SelectedIndex = s.IconStyle == IconStyle.Percentage ? 0 : 1;
-            foreach (var (c, box) in _categoryChecks) box.IsChecked = !s.HiddenCategories.Contains(c);
+            IconStyleBox.SelectedItem = IconStyleBox.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == s.IconStyle.ToString())
+                ?? IconStyleBox.Items[0];
+            PercentSignSwitch.IsOn = s.ShowPercentSign;
+            ColorNumberSwitch.IsOn = s.ColorNumber;
             AutostartSwitch.IsOn = s.StartWithWindows;
             int i = Array.IndexOf(Intervals, s.RefreshMinutes);
             IntervalBox.SelectedIndex = i >= 0 ? i : 1;
             NotifyLowSwitch.IsOn = s.NotifyLowBattery;
             NotifyChargedSwitch.IsOn = s.NotifyCharged;
-            int t = Array.IndexOf(Thresholds, s.LowBatteryThreshold);
-            ThresholdBox.SelectedIndex = t >= 0 ? t : Array.IndexOf(Thresholds, 20);
-            ThresholdBox.IsEnabled = s.NotifyLowBattery;
+            SelectByTag(TrayModeBox, s.TrayMode.ToString());
+            SelectByTag(DisconnectedBox, s.Disconnected.ToString());
+            ShowRules(s.AlertRules);
+            // Rules only matter while low-battery alerts are on: show them, but read-only, when off.
+            _rulesEnabled = AddRuleButton.IsEnabled = s.NotifyLowBattery;
+            foreach (var row in RuleList.Children.OfType<Grid>()) EnableRow(row);
         }
         finally { _applying = false; }
     }
 
     void OnIconStyleChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_applying || IconStyleBox.SelectedIndex < 0) return;
-        var style = IconStyleBox.SelectedIndex == 0 ? IconStyle.Percentage : IconStyle.Glyph;
+        if (_applying || IconStyleBox.SelectedItem is not ComboBoxItem { Tag: string tag } || !Enum.TryParse<IconStyle>(tag, out var style)) return;
         _ = App.Host.ChangeSettingsAsync(s => s.IconStyle = style);
     }
 
-    void OnCategoryClick(object sender, RoutedEventArgs e)
+    void OnPercentSignToggled(object sender, RoutedEventArgs e)
     {
-        if (_applying || sender is not CheckBox { Tag: DeviceCategory c } box) return;
-        bool shown = box.IsChecked == true;
-        _ = App.Host.ChangeSettingsAsync(s => { if (shown) s.HiddenCategories.Remove(c); else s.HiddenCategories.Add(c); });
+        if (_applying) return;
+        bool on = PercentSignSwitch.IsOn;
+        _ = App.Host.ChangeSettingsAsync(s => s.ShowPercentSign = on);
+    }
+
+    void OnColorNumberToggled(object sender, RoutedEventArgs e)
+    {
+        if (_applying) return;
+        bool on = ColorNumberSwitch.IsOn;
+        _ = App.Host.ChangeSettingsAsync(s => s.ColorNumber = on);
     }
 
     void OnAutostartToggled(object sender, RoutedEventArgs e)
@@ -89,13 +91,101 @@ public sealed partial class SettingsPage : UserControl
         _ = App.Host.ChangeSettingsAsync(s => s.NotifyCharged = on);
     }
 
-    void OnThresholdChanged(object sender, SelectionChangedEventArgs e)
+    static void SelectByTag(ComboBox box, string tag) =>
+        box.SelectedItem = box.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == tag) ?? box.Items[0];
+
+    void OnTrayModeChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_applying || ThresholdBox.SelectedItem is not ComboBoxItem { Tag: int percent }) return;
-        _ = App.Host.ChangeSettingsAsync(s => s.LowBatteryThreshold = percent);
+        if (_applying || TrayModeBox.SelectedItem is not ComboBoxItem { Tag: string tag } || !Enum.TryParse<TrayMode>(tag, out var mode)) return;
+        _ = App.Host.ChangeSettingsAsync(s => s.TrayMode = mode);
     }
 
-    void OnTestNotificationClick(object sender, RoutedEventArgs e) => _ = App.Host.TestNotificationAsync();
+    void OnDisconnectedChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_applying || DisconnectedBox.SelectedItem is not ComboBoxItem { Tag: string tag } || !Enum.TryParse<DisconnectedInTray>(tag, out var rule)) return;
+        _ = App.Host.ChangeSettingsAsync(s => s.Disconnected = rule);
+    }
+
+    // ---- Low-battery alert rules: one row each (limit, message, test, remove) ----
+
+    sealed record RuleRow(NumberBox Percent, TextBox Message);
+
+    readonly List<RuleRow> _ruleRows = [];
+    bool _rulesEnabled = true;
+
+    void EnableRow(Grid row)
+    {
+        foreach (var child in row.Children)
+            foreach (var control in child is Panel p ? p.Children.OfType<Control>() : child is Control c ? [c] : [])
+                control.IsEnabled = _rulesEnabled;
+    }
+
+    /// Rebuilds the rows only when the rules changed elsewhere, so typing in a row keeps its focus.
+    void ShowRules(List<AlertRule> rules)
+    {
+        var ordered = rules.OrderByDescending(r => r.Percent).ToList();
+        if (ordered.Count == _ruleRows.Count && ordered.Zip(_ruleRows).All(p => p.First.Percent == (int)p.Second.Percent.Value && (p.First.Message ?? "") == p.Second.Message.Text.Trim()))
+            return;
+        RuleList.Children.Clear();
+        _ruleRows.Clear();
+        foreach (var rule in ordered) AddRuleRow(rule);
+    }
+
+    void AddRuleRow(AlertRule rule)
+    {
+        var percent = new NumberBox
+        {
+            Value = rule.Percent, Minimum = 1, Maximum = 99, SmallChange = 5, Width = 110,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact, VerticalAlignment = VerticalAlignment.Center,
+        };
+        AutomationProperties.SetName(percent, "Limite do aviso, em porcentagem");
+        var message = new TextBox { Text = rule.Message ?? "", PlaceholderText = "Bateria baixa", VerticalAlignment = VerticalAlignment.Center };
+        AutomationProperties.SetName(message, "Mensagem do aviso");
+        var row = new RuleRow(percent, message);
+
+        var test = new Button { Content = "Testar", VerticalAlignment = VerticalAlignment.Center };
+        test.Click += (_, _) => _ = App.Host.TestNotificationAsync((int)percent.Value, message.Text);
+        var remove = new Button { Content = new FontIcon { Glyph = "", FontSize = 12 }, VerticalAlignment = VerticalAlignment.Center };
+        AutomationProperties.SetName(remove, "Remover aviso");
+        ToolTipService.SetToolTip(remove, "Remover aviso");
+
+        var grid = new Grid { ColumnSpacing = 8 };
+        foreach (var w in new[] { GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto })
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = w });
+        var pctPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+        pctPanel.Children.Add(percent);
+        pctPanel.Children.Add(new TextBlock { Text = "%", VerticalAlignment = VerticalAlignment.Center });
+        grid.Children.Add(pctPanel);
+        Grid.SetColumn(message, 1); grid.Children.Add(message);
+        Grid.SetColumn(test, 2); grid.Children.Add(test);
+        Grid.SetColumn(remove, 3); grid.Children.Add(remove);
+
+        remove.Click += (_, _) => { _ruleRows.Remove(row); RuleList.Children.Remove(grid); SaveRules(); };
+        percent.ValueChanged += (_, _) => { if (double.IsNaN(percent.Value)) percent.Value = rule.Percent; else SaveRules(); };
+        message.LostFocus += (_, _) => SaveRules();
+
+        RuleList.Children.Add(grid);
+        _ruleRows.Add(row);
+        EnableRow(grid);
+    }
+
+    void SaveRules()
+    {
+        if (_applying) return;
+        var rules = _ruleRows.Select(r => new AlertRule
+        {
+            Percent = (int)Math.Clamp(r.Percent.Value, 1, 99),
+            Message = string.IsNullOrWhiteSpace(r.Message.Text) ? null : r.Message.Text.Trim(),
+        }).ToList();
+        _ = App.Host.ChangeSettingsAsync(s => s.AlertRules = rules);
+    }
+
+    void OnAddRuleClick(object sender, RoutedEventArgs e)
+    {
+        int lowest = _ruleRows.Count > 0 ? (int)_ruleRows.Min(r => r.Percent.Value) : 25;
+        AddRuleRow(new AlertRule { Percent = Math.Max(1, lowest - 5) });
+        SaveRules();
+    }
 
     void OnIntervalChanged(object sender, SelectionChangedEventArgs e)
     {

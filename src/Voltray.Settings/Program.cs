@@ -18,8 +18,9 @@ public static partial class Program
         using var single = new Mutex(true, @"Local\Voltray.Settings", out bool first);
         if (!first)
         {
+            // --no-activate (automation) must never pull an existing window over what the user is doing.
             nint w = FindWindow("WinUIDesktopWin32WindowClass", MainWindow.WindowTitle);
-            if (w != 0) { ShowWindow(w, 9 /* SW_RESTORE */); SetForegroundWindow(w); }
+            if (w != 0 && !args.Contains("--no-activate")) { ShowWindow(w, 9 /* SW_RESTORE */); SetForegroundWindow(w); }
             return 0;
         }
 

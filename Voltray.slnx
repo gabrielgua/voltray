@@ -5,6 +5,7 @@
     <Project Path="src/Voltray.Platform/Voltray.Platform.csproj" />
     <Project Path="src/Voltray.Providers.Bluetooth/Voltray.Providers.Bluetooth.csproj" />
     <Project Path="src/Voltray.Providers.Logitech/Voltray.Providers.Logitech.csproj" />
+    <Project Path="src/Voltray.Rendering/Voltray.Rendering.csproj" />
     <Project Path="src/Voltray.Settings/Voltray.Settings.csproj">
       <Platform Project="x64" />
     </Project>

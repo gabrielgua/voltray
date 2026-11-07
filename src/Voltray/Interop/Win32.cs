@@ -36,9 +36,6 @@ internal static unsafe partial class Win32
     [StructLayout(LayoutKind.Sequential)] public struct MSG { public nint hwnd; public uint message; public nint wParam, lParam; public uint time; public int x, y; }
     [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
-    [StructLayout(LayoutKind.Sequential)] public struct ICONINFO { public int fIcon, xHotspot, yHotspot; public nint hbmMask, hbmColor; }
-    [StructLayout(LayoutKind.Sequential)]
-    public struct BITMAPINFOHEADER { public uint biSize; public int biWidth, biHeight; public ushort biPlanes, biBitCount; public uint biCompression, biSizeImage; public int biXPelsPerMeter, biYPelsPerMeter; public uint biClrUsed, biClrImportant; }
 
     [LibraryImport("shell32.dll", EntryPoint = "Shell_NotifyIconW")] [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool Shell_NotifyIcon(uint msg, ref NOTIFYICONDATAW data);
@@ -67,19 +64,6 @@ internal static unsafe partial class Win32
     [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static partial bool GetCursorPos(out POINT p);
     [LibraryImport("user32.dll")] public static partial uint GetDpiForSystem();
     [LibraryImport("user32.dll")] public static partial int GetSystemMetricsForDpi(int idx, uint dpi);
-    [LibraryImport("user32.dll")] public static partial nint CreateIconIndirect(ref ICONINFO ii);
     [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static partial bool DestroyIcon(nint h);
-    [LibraryImport("user32.dll", EntryPoint = "DrawTextW", StringMarshalling = StringMarshalling.Utf16)] public static partial int DrawText(nint dc, string s, int n, ref RECT r, uint fmt);
 
-    [LibraryImport("gdi32.dll")] public static partial nint CreateCompatibleDC(nint dc);
-    [LibraryImport("gdi32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static partial bool DeleteDC(nint dc);
-    [LibraryImport("gdi32.dll")] public static partial nint CreateDIBSection(nint dc, ref BITMAPINFOHEADER bi, uint usage, out byte* bits, nint sec, uint off);
-    [LibraryImport("gdi32.dll")] public static partial nint CreateBitmap(int w, int h, uint planes, uint bpp, nint bits);
-    [LibraryImport("gdi32.dll")] public static partial nint SelectObject(nint dc, nint obj);
-    [LibraryImport("gdi32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static partial bool DeleteObject(nint obj);
-    [LibraryImport("gdi32.dll", EntryPoint = "CreateFontW", StringMarshalling = StringMarshalling.Utf16)]
-    public static partial nint CreateFont(int h, int w, int esc, int orient, int weight, uint italic, uint underline, uint strike, uint charset, uint outPrec, uint clipPrec, uint quality, uint pitch, string face);
-    [LibraryImport("gdi32.dll")] public static partial uint SetTextColor(nint dc, uint color);
-    [LibraryImport("gdi32.dll")] public static partial int SetBkMode(nint dc, int mode);
-    [LibraryImport("gdi32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static partial bool GdiFlush();
 }

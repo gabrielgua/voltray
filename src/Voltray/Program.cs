@@ -5,6 +5,7 @@ using Voltray.Core;
 using Voltray.Ipc;
 using Voltray.Providers.Bluetooth;
 using Voltray.Providers.Logitech;
+using Voltray.Rendering;
 using Voltray.Tray;
 using static Voltray.Interop.Win32;
 
@@ -16,7 +17,10 @@ internal static class Program
 {
     const uint WM_DEVICES_CHANGED = WM_APP + 1, WM_INVOKE = WM_APP + 2, WM_TRAY_BASE = WM_APP + 0x10;
     const nint TimerRefresh = 1;
-    const int CmdRefresh = 1, CmdExit = 2, CmdStylePercentage = 3, CmdStyleGlyph = 4, CmdHideCategory = 5, CmdShowAll = 6, CmdOpen = 7;
+    const int CmdRefresh = 1, CmdExit = 2, CmdHideCategory = 5, CmdShowAll = 6, CmdOpen = 7, CmdStyleBase = 100;
+
+    static readonly (IconStyle, string)[] StyleMenu =
+        [(IconStyle.Glyph, "Barra"), (IconStyle.GlyphBarSide, "Barra vertical"), (IconStyle.GlyphColorSteps, "Ícone colorido"), (IconStyle.GlyphNumber, "Número")];
 
     /// Window class + title of the settings window (WinUI 3 desktop windows use this class).
     const string SettingsWindowClass = "WinUIDesktopWin32WindowClass", SettingsWindowTitle = "Voltray";
@@ -36,7 +40,11 @@ internal static class Program
     [STAThread]
     static unsafe int Main(string[] args)
     {
-        if (args is ["--icon-preview", var path]) { IconRenderer.WritePreview(path); return 0; }
+        if (args is ["--icon-preview", var path])
+        {
+            try { IconRenderer.WritePreview(path); return 0; }
+            catch (Exception e) { Log.Error("icon preview", e); return 1; }
+        }
 
         using var single = new Mutex(true, @"Local\Voltray", out bool first);
         if (!first)
@@ -135,18 +143,20 @@ internal static class Program
 
     static void NotifyAlerts(IReadOnlyList<DeviceState> devices)
     {
-        var options = new AlertOptions(_settings.NotifyLowBattery, _settings.LowBatteryThreshold, _settings.NotifyCharged, _settings.MutedDevices);
+        var options = new AlertOptions(_settings.NotifyLowBattery, [.. _settings.AlertRules.Select(r => r.Percent)], _settings.NotifyCharged, _settings.MutedDevices);
         foreach (var a in Alerts.Evaluate(devices, options))
         {
-            var (title, text) = a.Kind switch
+            if (a.Kind == AlertKind.Charged)
             {
-                AlertKind.Critical => ($"Bateria crítica: {a.DeviceName}", $"{a.Percent}% restantes. Conecte o carregador logo."),
-                AlertKind.Low => ($"Bateria baixa: {a.DeviceName}", $"{a.Percent}% restantes."),
-                _ => ($"Carga completa: {a.DeviceName}", "Pode desconectar o carregador."),
-            };
-            _tray?.Notify(a.Category, title, text, warning: a.Kind != AlertKind.Charged);
+                _tray?.Notify(a.Category, $"{a.DeviceName} – carga completa", "Pode desconectar o carregador.", warning: false, deviceId: a.DeviceId);
+                continue;
+            }
+            var rule = _settings.AlertRules.FirstOrDefault(r => r.Percent == a.Threshold);
+            _tray?.Notify(a.Category, $"{a.DeviceName} – {a.Percent}%", AlertText(rule?.Message), warning: true, deviceId: a.DeviceId);
         }
     }
+
+    static string AlertText(string? message) => string.IsNullOrWhiteSpace(message) ? "Bateria baixa" : message.Trim();
 
     static void HandleCommand(Message m)
     {
@@ -170,8 +180,8 @@ internal static class Program
                 _ = Task.Run(RefreshAsync);
                 break;
             case MessageType.TestNotification:
-                _tray?.Notify(DeviceCategory.Mouse, "Bateria baixa: dispositivo de teste",
-                    $"{_settings.LowBatteryThreshold}% restantes. É assim que os avisos do Voltray aparecem.", warning: true);
+                int pct = m.Percent ?? _settings.AlertRules.Select(r => r.Percent).DefaultIfEmpty(20).Max();
+                _tray?.Notify(DeviceCategory.Mouse, $"Dispositivo de teste – {pct}%", AlertText(m.Text), warning: true);
                 break;
         }
     }
@@ -183,11 +193,11 @@ internal static class Program
         {
             if (msg == _taskbarCreated && msg != 0 && _tray != null) { _tray.Recreate(Registry.Snapshot(), _settings); return 0; } // Explorer restarted
             if (_tray is null) return DefWindowProc(hwnd, msg, wParam, lParam); // messages sent during CreateWindowEx
-            if (_tray.TryGetCategory(msg, out var category))
+            if (_tray.TryGetTarget(msg, out var target))
             {
                 uint ev = (uint)(lParam & 0xFFFF);
                 if (ev is NIN_SELECT or NIN_KEYSELECT or NIN_BALLOONUSERCLICK) OpenSettingsWindow(); // left click / Enter / notification click
-                else if (ev == WM_CONTEXTMENU) ShowMenu(category, (short)(wParam & 0xFFFF), (short)((wParam >> 16) & 0xFFFF));
+                else if (ev == WM_CONTEXTMENU) ShowMenu(target, (short)(wParam & 0xFFFF), (short)((wParam >> 16) & 0xFFFF));
                 return 0;
             }
             switch (msg)
@@ -214,9 +224,12 @@ internal static class Program
         return DefWindowProc(hwnd, msg, wParam, lParam);
     }
 
-    static void ShowMenu(DeviceCategory category, int x, int y)
+    static void ShowMenu(IconTarget target, int x, int y)
     {
-        var devices = Registry.Snapshot().Where(d => d.Info.Category == category && !_settings.HiddenDevices.Contains(d.Info.Id)).ToList();
+        var devices = Registry.Snapshot()
+            .Where(d => target.DeviceId is { } id ? d.Info.Id == id : d.Info.Category == target.Category && !_settings.HiddenDevices.Contains(d.Info.Id))
+            .ToList();
+        string hideLabel = target.DeviceId != null && devices.Count == 1 ? $"Ocultar {devices[0].Info.Name} da bandeja" : $"Ocultar ícone de {TrayManager.Label(target.Category)}";
         nint menu = CreatePopupMenu(), style = CreatePopupMenu();
         try
         {
@@ -227,11 +240,11 @@ internal static class Program
                 AppendMenu(menu, MF_STRING | MF_GRAYED, 0, $"{d.Info.Name}  —  {TrayManager.Describe(d)}");
             if (devices.Count > 0) AppendMenu(menu, MF_SEPARATOR, 0, null);
 
-            AppendMenu(style, MF_STRING | (_settings.IconStyle == IconStyle.Percentage ? MF_CHECKED : 0), CmdStylePercentage, "Porcentagem");
-            AppendMenu(style, MF_STRING | (_settings.IconStyle == IconStyle.Glyph ? MF_CHECKED : 0), CmdStyleGlyph, "Símbolo da categoria");
+            foreach (var (st, label) in StyleMenu)
+                AppendMenu(style, MF_STRING | (_settings.IconStyle == st ? MF_CHECKED : 0), CmdStyleBase + (int)st, label);
             AppendMenu(menu, MF_POPUP, style, "Estilo do ícone");
-            if (devices.Count > 0) AppendMenu(menu, MF_STRING, CmdHideCategory, $"Ocultar ícone de {TrayManager.Label(category)}");
-            if (_settings.HiddenCategories.Count > 0) AppendMenu(menu, MF_STRING, CmdShowAll, "Mostrar ícones ocultos");
+            if (devices.Count > 0) AppendMenu(menu, MF_STRING, CmdHideCategory, hideLabel);
+            if (_settings.HiddenCategories.Count > 0 || _settings.HiddenDevices.Count > 0) AppendMenu(menu, MF_STRING, CmdShowAll, "Mostrar ícones ocultos");
             AppendMenu(menu, MF_STRING, CmdRefresh, "Atualizar agora");
             AppendMenu(menu, MF_SEPARATOR, 0, null);
             AppendMenu(menu, MF_STRING, CmdExit, "Sair do Voltray");
@@ -243,10 +256,10 @@ internal static class Program
                 case CmdOpen: OpenSettingsWindow(); break;
                 case CmdRefresh: _ = Task.Run(RefreshAsync); break;
                 case CmdExit: PostQuitMessage(0); break;
-                case CmdStylePercentage: ChangeSettings(s => s.IconStyle = IconStyle.Percentage); break;
-                case CmdStyleGlyph: ChangeSettings(s => s.IconStyle = IconStyle.Glyph); break;
-                case CmdHideCategory: ChangeSettings(s => s.HiddenCategories.Add(category)); break;
-                case CmdShowAll: ChangeSettings(s => s.HiddenCategories.Clear()); break;
+                case >= CmdStyleBase: ChangeSettings(s => s.IconStyle = (IconStyle)(cmd - CmdStyleBase)); break;
+                case CmdHideCategory when target.DeviceId is { } id: ChangeSettings(s => s.HiddenDevices.Add(id)); break;
+                case CmdHideCategory: ChangeSettings(s => s.HiddenCategories.Add(target.Category)); break;
+                case CmdShowAll: ChangeSettings(s => { s.HiddenCategories.Clear(); s.HiddenDevices.Clear(); }); break;
             }
         }
         finally { DestroyMenu(menu); } // destroys the submenu too

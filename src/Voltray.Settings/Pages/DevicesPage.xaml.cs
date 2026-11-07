@@ -1,9 +1,13 @@
 using System.Collections.ObjectModel;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media.Imaging;
 using Voltray.Core;
+using Voltray.Core.Icons;
 using Voltray.Ipc;
 using Voltray.Settings.ViewModels;
+using Windows.Storage.Streams;
 
 namespace Voltray.Settings.Pages;
 
@@ -70,19 +74,41 @@ public sealed partial class DevicesPage : UserControl
     {
         if (sender is not Button { Tag: DeviceViewModel vm } button) return;
         var category = new MenuFlyoutSubItem { Text = "Categoria", Icon = new FontIcon { Glyph = "" } };
-        var auto = new RadioMenuFlyoutItem { Text = "Automática", GroupName = "cat", IsChecked = vm.IsCategoryAutomatic };
+        // Plain items with a ✓ on the right for the current choice: radio items would add an
+        // empty marker column that pushes every icon and label to the right.
+        var auto = new MenuFlyoutItem { Text = "Automática" };
+        MarkSelected(auto, vm.IsCategoryAutomatic);
         auto.Click += (_, _) => _ = App.Host.SetCategoryAsync(vm.Id, null);
         category.Items.Add(auto);
         category.Items.Add(new MenuFlyoutSeparator());
         foreach (var c in Categories.All)
         {
-            var item = new RadioMenuFlyoutItem
-            {
-                Text = Categories.Label(c), GroupName = "cat", IsChecked = !vm.IsCategoryAutomatic && vm.Category == c,
-                Icon = new FontIcon { Glyph = Categories.Glyph(c) },
-            };
+            var item = new MenuFlyoutItem { Text = Categories.Label(c), Icon = SvgIcon(CategoryIcons.For(c), button) };
+            MarkSelected(item, !vm.IsCategoryAutomatic && vm.Category == c);
             item.Click += (_, _) => _ = App.Host.SetCategoryAsync(vm.Id, c);
             category.Items.Add(item);
+        }
+
+        // Tray icon for this device (used when the tray shows one icon per device).
+        var settings = App.Host.State?.Settings;
+        string? current = settings?.DeviceIcons.GetValueOrDefault(vm.Id);
+        var icon = new MenuFlyoutSubItem { Text = "Ícone na bandeja", Icon = new FontIcon { Glyph = "" } };
+        var byCategory = new MenuFlyoutItem { Text = "Da categoria", Icon = SvgIcon(CategoryIcons.For(vm.Category), button) };
+        MarkSelected(byCategory, current is null);
+        byCategory.Click += (_, _) => _ = App.Host.ChangeSettingsAsync(s => s.DeviceIcons.Remove(vm.Id));
+        icon.Items.Add(byCategory);
+        icon.Items.Add(new MenuFlyoutSeparator());
+        foreach (var entry in DeviceIcons.All)
+        {
+            var item = new MenuFlyoutItem { Text = entry.Label, Icon = SvgIcon(entry.Path, button) };
+            MarkSelected(item, current == entry.Key);
+            item.Click += (_, _) => _ = App.Host.ChangeSettingsAsync(s => s.DeviceIcons[vm.Id] = entry.Key);
+            icon.Items.Add(item);
+        }
+        if (settings?.TrayMode == TrayMode.PerCategory)
+        {
+            icon.Items.Add(new MenuFlyoutSeparator());
+            icon.Items.Add(new MenuFlyoutItem { Text = "Aparece no modo \"um ícone por dispositivo\"", IsEnabled = false });
         }
         var notify = new ToggleMenuFlyoutItem { Text = "Notificações de bateria", IsChecked = vm.Notify, Icon = new FontIcon { Glyph = "\uEA8F" } };
         notify.Click += (_, _) =>
@@ -93,6 +119,38 @@ public sealed partial class DevicesPage : UserControl
         var menu = new MenuFlyout();
         menu.Items.Add(notify);
         menu.Items.Add(category);
+        menu.Items.Add(icon);
         menu.ShowAt(button);
+    }
+
+    static void MarkSelected(MenuFlyoutItem item, bool selected)
+    {
+        if (!selected) return;
+        item.KeyboardAcceleratorTextOverride = "✓";
+        AutomationProperties.SetItemStatus(item, "Selecionada");
+    }
+
+    /// A Hugeicons symbol (same as the tray icons) as an SVG in the menu's text colour.
+    static ImageIcon SvgIcon(string path, FrameworkElement themeOf)
+    {
+        string color = themeOf.ActualTheme == ElementTheme.Light ? "#1A1A1A" : "#FFFFFF";
+        string svg = $"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"{color}\" " +
+                     $"stroke-width=\"{CategoryIcons.Stroke}\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"{path}\"/></svg>";
+        var source = new SvgImageSource();
+        _ = LoadSvgAsync(source, svg);
+        return new ImageIcon { Source = source };
+    }
+
+    static async Task LoadSvgAsync(SvgImageSource source, string svg)
+    {
+        using var stream = new InMemoryRandomAccessStream();
+        using (var writer = new DataWriter(stream))
+        {
+            writer.WriteString(svg);
+            await writer.StoreAsync();
+            writer.DetachStream();
+        }
+        stream.Seek(0);
+        await source.SetSourceAsync(stream);
     }
 }
