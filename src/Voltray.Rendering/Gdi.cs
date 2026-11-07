@@ -31,5 +31,8 @@ internal static unsafe partial class Gdi
     [LibraryImport("gdi32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static partial bool MoveToEx(nint dc, int x, int y, nint prev);
     [LibraryImport("gdi32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static partial bool PolyBezierTo(nint dc, POINT* pts, uint count);
     [LibraryImport("gdi32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static partial bool Ellipse(nint dc, int l, int t, int r, int b);
+    [LibraryImport("gdi32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static partial bool WidenPath(nint dc);
+    [LibraryImport("gdi32.dll")] public static partial int GetPath(nint dc, POINT* pts, byte* types, int count);
+    public const int PT_CLOSEFIGURE = 1, PT_LINETO = 2, PT_BEZIERTO = 4, PT_MOVETO = 6;
     [LibraryImport("user32.dll")] public static partial nint CreateIconIndirect(ref ICONINFO ii);
 }

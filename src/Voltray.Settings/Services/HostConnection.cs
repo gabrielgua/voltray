@@ -50,7 +50,7 @@ public sealed class HostConnection(DispatcherQueue ui)
     public Task SetSettingsAsync(Ipc.Settings settings) => SendAsync(new Message(MessageType.SetSettings, Settings: settings));
     public Task SetCategoryAsync(string deviceId, DeviceCategory? category) => SendAsync(new Message(MessageType.SetCategory, DeviceId: deviceId, Category: category));
     public Task RefreshAsync() => SendAsync(new Message(MessageType.Refresh));
-    public Task TestNotificationAsync(int percent, string? message) => SendAsync(new Message(MessageType.TestNotification, Percent: percent, Text: message));
+    public Task TestNotificationAsync(int percent, string? message, bool urgent) => SendAsync(new Message(MessageType.TestNotification, Percent: percent, Text: message, Urgent: urgent));
 
     /// Applies <paramref name="change"/> to a copy of the current settings and sends it.
     public Task ChangeSettingsAsync(Action<Ipc.Settings> change)

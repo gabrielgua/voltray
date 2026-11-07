@@ -17,7 +17,12 @@ public sealed record DeviceDto(
     string? Source,
     DateTimeOffset? UpdatedAt,
     bool ShownInTray,
-    bool Notify);
+    bool Notify,
+    /// Smoothed level for coarse reporters (differs from Percent only when Interpolated).
+    int? EstimatedPercent = null,
+    bool Interpolated = false,
+    /// Estimated time until empty, from the device's drain history.
+    int? RemainingMinutes = null);
 
 public sealed record StateDto(string Version, List<DeviceDto> Devices, Settings Settings);
 
@@ -46,7 +51,8 @@ public sealed record Message(
     string? DeviceId = null,
     DeviceCategory? Category = null,
     int? Percent = null,
-    string? Text = null);
+    string? Text = null,
+    bool Urgent = false);
 
 [JsonSourceGenerationOptions(WriteIndented = false, UseStringEnumConverter = true, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(Message))]

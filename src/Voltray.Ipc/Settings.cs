@@ -37,6 +37,8 @@ public sealed class AlertRule
     public int Percent { get; set; }
     /// Shown under the title; null or empty = default text.
     public string? Message { get; set; }
+    /// Urgent alerts can show during Do Not Disturb, if the user allows priority notifications for Voltray.
+    public bool Urgent { get; set; }
 }
 
 /// User preferences, stored as JSON in %AppData%\Voltray\settings.json.
@@ -75,7 +77,7 @@ public sealed class Settings
     public static List<AlertRule> DefaultAlertRules() =>
     [
         new() { Percent = 20, Message = "Bateria baixa, carregue em breve" },
-        new() { Percent = 10, Message = "Bateria crítica" },
+        new() { Percent = 10, Message = "Bateria crítica", Urgent = true },
     ];
 
     static string FilePath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Voltray", "settings.json");

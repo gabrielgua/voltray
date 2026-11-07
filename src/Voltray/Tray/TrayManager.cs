@@ -39,6 +39,7 @@ internal sealed unsafe class TrayManager(nint hwnd, uint callbackMessage)
     }
 
     readonly Dictionary<IconTarget, Slot> _shown = new();
+    IReadOnlyDictionary<string, BatteryEstimate> _estimates = new Dictionary<string, BatteryEstimate>();
 
     public static string Label(DeviceCategory c) => c switch
     {
@@ -50,15 +51,19 @@ internal sealed unsafe class TrayManager(nint hwnd, uint callbackMessage)
         _ => "Outros",
     };
 
-    public static string Describe(DeviceState d) => d switch
+    public static string Describe(DeviceState d, BatteryEstimate? e = null) => d switch
     {
         { Connected: false, Battery.Percent: int p } => $"desconectado (último: {p}%)",
         { Connected: false } => "desconectado",
         { Battery: null } => "sem dados",
         { Battery: { Percent: int p, Charge: ChargeState.Charging } } => $"{p}% carregando",
-        { Battery.Percent: int p } => $"{p}%",
+        { Battery.Percent: int p } => (e is { Interpolated: true } ? $"≈{e.Percent}%" : $"{p}%") + (e?.Remaining is TimeSpan r ? $" · {FormatRemaining(r)}" : ""),
         _ => d.Battery!.Level.ToString().ToLowerInvariant(),
     };
+
+    /// "~45 min", "~14 h", "~3 dias".
+    public static string FormatRemaining(TimeSpan r) =>
+        r.TotalHours < 1 ? $"~{Math.Max(1, (int)r.TotalMinutes)} min" : r.TotalHours < 48 ? $"~{(int)Math.Round(r.TotalHours)} h" : $"~{(int)Math.Round(r.TotalDays)} dias";
 
     public bool TryGetTarget(uint msg, out IconTarget target)
     {
@@ -71,8 +76,12 @@ internal sealed unsafe class TrayManager(nint hwnd, uint callbackMessage)
         return true;
     }
 
-    public void Update(IReadOnlyList<DeviceState> devices, Settings settings)
+    public void Update(IReadOnlyList<DeviceState> devices, Settings settings, IReadOnlyDictionary<string, BatteryEstimate>? estimates = null)
     {
+        _estimates = estimates ?? new Dictionary<string, BatteryEstimate>();
+        // Coarse reporters: draw the interpolated level, not the bottom of the reported range.
+        devices = [.. devices.Select(d => _estimates.GetValueOrDefault(d.Info.Id) is { Interpolated: true } e && d.Battery != null
+            ? d with { Battery = d.Battery with { Percent = e.Percent } } : d)];
         var visible = devices
             .Where(d => !settings.HiddenDevices.Contains(d.Info.Id) && !settings.HiddenCategories.Contains(d.Info.Category))
             .Where(d => d.Connected || settings.Disconnected == DisconnectedInTray.Dim)
@@ -129,8 +138,8 @@ internal sealed unsafe class TrayManager(nint hwnd, uint callbackMessage)
         nid.uCallbackMessage = callbackMessage + (uint)slot.Index;
         nid.hIcon = icon;
         string tip = list.Count == 0 ? "Voltray\nNenhum dispositivo com bateria encontrado"
-            : target.DeviceId != null ? $"{Shorten(list[0].Info.Name, 60)}\n{Describe(list[0])}"
-            : Label(target.Category) + "\n" + string.Join("\n", list.Select(d => $"{Shorten(d.Info.Name, 24)} — {Describe(d)}"));
+            : target.DeviceId != null ? $"{Shorten(list[0].Info.Name, 60)}\n{Describe(list[0], Est(list[0]))}"
+            : Label(target.Category) + "\n" + string.Join("\n", list.Select(d => $"{Shorten(d.Info.Name, 24)} — {Describe(d, Est(d))}"));
         if (tip.Length > 127) tip = tip[..126] + "…"; // szTip limit is 128 chars including the terminator
         tip.AsSpan().CopyTo(new Span<char>(nid.szTip, 128));
 
@@ -199,6 +208,8 @@ internal sealed unsafe class TrayManager(nint hwnd, uint callbackMessage)
         hash[8] = (byte)(hash[8] & 0x3F | 0x80); // RFC 4122 variant
         return new Guid(hash);
     }
+
+    BatteryEstimate? Est(DeviceState d) => _estimates.GetValueOrDefault(d.Info.Id);
 
     static string Name(IconTarget t) => t.DeviceId ?? t.Category.ToString();
 

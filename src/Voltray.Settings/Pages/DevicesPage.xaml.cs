@@ -2,12 +2,13 @@ using System.Collections.ObjectModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.UI.Xaml.Markup;
+using Microsoft.UI.Xaml.Media;
+using Voltray.Rendering;
 using Voltray.Core;
 using Voltray.Core.Icons;
 using Voltray.Ipc;
 using Voltray.Settings.ViewModels;
-using Windows.Storage.Streams;
 
 namespace Voltray.Settings.Pages;
 
@@ -83,33 +84,15 @@ public sealed partial class DevicesPage : UserControl
         category.Items.Add(new MenuFlyoutSeparator());
         foreach (var c in Categories.All)
         {
-            var item = new MenuFlyoutItem { Text = Categories.Label(c), Icon = SvgIcon(CategoryIcons.For(c), button) };
+            var item = new MenuFlyoutItem { Text = Categories.Label(c), Icon = VectorIcon(CategoryIcons.For(c), 16) };
             MarkSelected(item, !vm.IsCategoryAutomatic && vm.Category == c);
             item.Click += (_, _) => _ = App.Host.SetCategoryAsync(vm.Id, c);
             category.Items.Add(item);
         }
 
-        // Tray icon for this device (used when the tray shows one icon per device).
-        var settings = App.Host.State?.Settings;
-        string? current = settings?.DeviceIcons.GetValueOrDefault(vm.Id);
-        var icon = new MenuFlyoutSubItem { Text = "Ícone na bandeja", Icon = new FontIcon { Glyph = "" } };
-        var byCategory = new MenuFlyoutItem { Text = "Da categoria", Icon = SvgIcon(CategoryIcons.For(vm.Category), button) };
-        MarkSelected(byCategory, current is null);
-        byCategory.Click += (_, _) => _ = App.Host.ChangeSettingsAsync(s => s.DeviceIcons.Remove(vm.Id));
-        icon.Items.Add(byCategory);
-        icon.Items.Add(new MenuFlyoutSeparator());
-        foreach (var entry in DeviceIcons.All)
-        {
-            var item = new MenuFlyoutItem { Text = entry.Label, Icon = SvgIcon(entry.Path, button) };
-            MarkSelected(item, current == entry.Key);
-            item.Click += (_, _) => _ = App.Host.ChangeSettingsAsync(s => s.DeviceIcons[vm.Id] = entry.Key);
-            icon.Items.Add(item);
-        }
-        if (settings?.TrayMode == TrayMode.PerCategory)
-        {
-            icon.Items.Add(new MenuFlyoutSeparator());
-            icon.Items.Add(new MenuFlyoutItem { Text = "Aparece no modo \"um ícone por dispositivo\"", IsEnabled = false });
-        }
+        // Tray icon for this device (used when the tray shows one icon per device): opens the picker grid.
+        var icon = new MenuFlyoutItem { Text = "Ícone na bandeja…", Icon = new FontIcon { Glyph = "" } };
+        icon.Click += (_, _) => ShowIconPicker(vm, button);
         var notify = new ToggleMenuFlyoutItem { Text = "Notificações de bateria", IsChecked = vm.Notify, Icon = new FontIcon { Glyph = "\uEA8F" } };
         notify.Click += (_, _) =>
         {
@@ -130,27 +113,90 @@ public sealed partial class DevicesPage : UserControl
         AutomationProperties.SetItemStatus(item, "Selecionada");
     }
 
-    /// A Hugeicons symbol (same as the tray icons) as an SVG in the menu's text colour.
-    static ImageIcon SvgIcon(string path, FrameworkElement themeOf)
+    /// A Hugeicons symbol (same as the tray icons) as vector geometry in the current text colour,
+    /// so it stays sharp at any scale and follows the theme.
+    static IconElement VectorIcon(string path, double size)
     {
-        string color = themeOf.ActualTheme == ElementTheme.Light ? "#1A1A1A" : "#FFFFFF";
-        string svg = $"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"{color}\" " +
-                     $"stroke-width=\"{CategoryIcons.Stroke}\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"{path}\"/></svg>";
-        var source = new SvgImageSource();
-        _ = LoadSvgAsync(source, svg);
-        return new ImageIcon { Source = source };
+        try
+        {
+            return new PathIcon
+            {
+                Data = (Geometry)XamlBindingHelper.ConvertValue(typeof(Geometry), IconOutline.Markup(path, size)),
+                Width = size, Height = size,
+            };
+        }
+        catch (Exception) { return new FontIcon { Glyph = "", FontSize = size * 0.75 }; } // never break the menu over an icon
     }
 
-    static async Task LoadSvgAsync(SvgImageSource source, string svg)
+    /// Grid of tray icons for one device, anchored to its "..." button.
+    void ShowIconPicker(DeviceViewModel vm, FrameworkElement anchor)
     {
-        using var stream = new InMemoryRandomAccessStream();
-        using (var writer = new DataWriter(stream))
+        var settings = App.Host.State?.Settings;
+        string? current = settings?.DeviceIcons.GetValueOrDefault(vm.Id);
+        var hover = new TextBlock { Text = " ", Style = (Style)Application.Current.Resources["SecondaryTextStyle"], TextTrimming = TextTrimming.CharacterEllipsis };
+        var grid = new GridView
         {
-            writer.WriteString(svg);
-            await writer.StoreAsync();
-            writer.DetachStream();
+            SelectionMode = ListViewSelectionMode.Single, IsItemClickEnabled = true, MaxHeight = 300,
+            Padding = new Thickness(0), Margin = new Thickness(-2, 0, -6, 0),
+        };
+        AutomationProperties.SetName(grid, "Ícones");
+        var flyout = new Flyout { Placement = Microsoft.UI.Xaml.Controls.Primitives.FlyoutPlacementMode.BottomEdgeAlignedRight };
+
+        // (key, label, path): key null = the category's icon
+        var options = new List<(string? Key, string Label, string Path)> { (null, "Da categoria", CategoryIcons.For(vm.Category)) };
+        options.AddRange(DeviceIcons.All.Select(e => ((string?)e.Key, e.Label, e.Path)));
+
+        void Fill(string query)
+        {
+            grid.Items.Clear();
+            foreach (var o in options.Where(o => query.Length == 0 || o.Label.Contains(query, StringComparison.CurrentCultureIgnoreCase)
+                                                 || (o.Key?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)))
+            {
+                var tile = new Grid { Width = 56, Height = 56, Tag = o.Key ?? "" };
+                tile.Children.Add(new Viewbox { Width = 28, Height = 28, Child = VectorIcon(o.Path, 28) });
+                if (o.Key is null)
+                    tile.Children.Add(new TextBlock
+                    {
+                        Text = "auto", FontSize = 10, Margin = new Thickness(0, 0, 0, 2),
+                        HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom,
+                        Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+                    });
+                ToolTipService.SetToolTip(tile, o.Label);
+                AutomationProperties.SetName(tile, o.Label);
+                string label = o.Label;
+                tile.PointerEntered += (_, _) => hover.Text = label;
+                tile.GotFocus += (_, _) => hover.Text = label;
+                grid.Items.Add(tile);
+                if (o.Key == current) grid.SelectedItem = tile;
+            }
         }
-        stream.Seek(0);
-        await source.SetSourceAsync(stream);
+
+        grid.ItemClick += (_, e) =>
+        {
+            if (e.ClickedItem is not Grid { Tag: string key }) return;
+            _ = App.Host.ChangeSettingsAsync(s => { if (key.Length == 0) s.DeviceIcons.Remove(vm.Id); else s.DeviceIcons[vm.Id] = key; });
+            flyout.Hide();
+        };
+
+        var search = new TextBox { PlaceholderText = "Buscar ícone" };
+        AutomationProperties.SetName(search, "Buscar ícone");
+        search.TextChanged += (_, _) => Fill(search.Text.Trim());
+        search.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Down && grid.Items.Count > 0) { grid.Focus(FocusState.Keyboard); e.Handled = true; } };
+
+        var panel = new StackPanel { Width = 384, Spacing = 8 };
+        panel.Children.Add(new TextBlock { Text = "Ícone na bandeja", Style = (Style)Application.Current.Resources["BodyStrongTextBlockStyle"] });
+        if (settings?.TrayMode == TrayMode.PerCategory)
+            panel.Children.Add(new TextBlock
+            {
+                Text = "Aparece no modo \"um ícone por dispositivo\".", TextWrapping = TextWrapping.Wrap,
+                Style = (Style)Application.Current.Resources["SecondaryTextStyle"],
+            });
+        panel.Children.Add(search);
+        panel.Children.Add(grid);
+        panel.Children.Add(hover);
+        flyout.Content = panel;
+        Fill("");
+        flyout.Opened += (_, _) => (grid.SelectedItem is UIElement sel ? grid.ContainerFromItem(sel) as Control : null)?.Focus(FocusState.Programmatic);
+        flyout.ShowAt(anchor);
     }
 }

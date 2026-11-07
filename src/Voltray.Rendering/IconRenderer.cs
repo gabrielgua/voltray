@@ -344,6 +344,30 @@ public static unsafe partial class IconRenderer
         Chunk(f, "IEND", []);
     }
 
+    /// Saves rendered pixels (straight-alpha BGRA) as an RGBA PNG, e.g. for notification images.
+    public static void SavePng(uint[] px, int size, string path)
+    {
+        var raw = new MemoryStream();
+        for (int y = 0; y < size; y++)
+        {
+            raw.WriteByte(0);
+            for (int x = 0; x < size; x++)
+            {
+                uint p = px[y * size + x];
+                raw.WriteByte((byte)(p >> 16)); raw.WriteByte((byte)(p >> 8)); raw.WriteByte((byte)p); raw.WriteByte((byte)(p >> 24));
+            }
+        }
+        using var f = File.Create(path);
+        f.Write([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+        var hdr = new byte[13];
+        BE(hdr, 0, size); BE(hdr, 4, size); hdr[8] = 8; hdr[9] = 6; // 8-bit RGBA
+        Chunk(f, "IHDR", hdr);
+        var z = new MemoryStream();
+        using (var zs = new ZLibStream(z, CompressionLevel.Optimal, true)) raw.WriteTo(zs);
+        Chunk(f, "IDAT", z.ToArray());
+        Chunk(f, "IEND", []);
+    }
+
     static void BE(byte[] b, int o, int v) { b[o] = (byte)(v >> 24); b[o + 1] = (byte)(v >> 16); b[o + 2] = (byte)(v >> 8); b[o + 3] = (byte)v; }
 
     static void Chunk(Stream s, string type, byte[] data)

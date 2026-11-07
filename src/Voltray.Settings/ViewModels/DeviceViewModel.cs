@@ -30,7 +30,8 @@ public sealed partial class DeviceViewModel : INotifyPropertyChanged
     public string Name => _dto.Name;
     public string Glyph => Categories.Glyph(_dto.Category);
 
-    public string PercentText => _dto.Percent is int p ? $"{p}%" : _dto.Level switch
+    /// "63%", or "≈44%" when the level is interpolated for a device that reports in coarse steps.
+    public string PercentText => _dto is { Interpolated: true, EstimatedPercent: int est } ? $"≈{est}%" : _dto.Percent is int p ? $"{p}%" : _dto.Level switch
     {
         BatteryLevel.Full => "Cheia",
         BatteryLevel.Good => "Boa",
@@ -39,7 +40,7 @@ public sealed partial class DeviceViewModel : INotifyPropertyChanged
         _ => "—",
     };
 
-    public double PercentValue => _dto.Percent ?? 0;
+    public double PercentValue => (_dto.Interpolated ? _dto.EstimatedPercent : _dto.Percent) ?? 0;
     public bool HasPercent => _dto.Percent != null;
     public Visibility ChargingVisibility => _dto.Connected && _dto.Charge == ChargeState.Charging ? Visibility.Visible : Visibility.Collapsed;
     public double CardOpacity => _dto.Connected ? 1 : 0.55;
@@ -58,12 +59,17 @@ public sealed partial class DeviceViewModel : INotifyPropertyChanged
         {
             var parts = new List<string>();
             if (!_dto.Connected) parts.Add("Desconectado");
+            else if (_dto.RemainingMinutes is int min && _dto.Charge != ChargeState.Charging) parts.Add(Remaining(min) + " restantes");
             if (_dto.Manufacturer is { } m) parts.Add(m);
             if (_dto.Source is { } s && _dto.Connected) parts.Add(s);
             if (_dto.UpdatedAt is { } t) parts.Add((_dto.Connected ? "atualizado " : "visto ") + Ago(t));
             return string.Join(" · ", parts);
         }
     }
+
+    /// Same wording as the tray tooltip: "~45 min", "~14 h", "~3 dias".
+    static string Remaining(int minutes) =>
+        minutes < 60 ? $"~{Math.Max(1, minutes)} min" : minutes < 48 * 60 ? $"~{(int)Math.Round(minutes / 60.0)} h" : $"~{(int)Math.Round(minutes / 1440.0)} dias";
 
     public string BatteryAutomationName => $"{Name}: bateria {PercentText}{(_dto.Charge == ChargeState.Charging ? ", carregando" : "")}";
 

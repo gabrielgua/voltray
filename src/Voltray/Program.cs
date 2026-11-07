@@ -33,6 +33,8 @@ internal static class Program
     static readonly List<IBatteryProvider> Providers = [new LogitechProvider(), new BluetoothProvider()];
     static readonly ConcurrentQueue<Action> UiQueue = new();
     static readonly BatteryAlerts Alerts = new();
+    static readonly HistoryStore History = new();
+    static Dictionary<string, BatteryEstimate> _estimates = [];
     static TrayManager? _tray;
     static IpcServer? _ipc;
     static volatile StateDto _state = new("", [], new());
@@ -68,6 +70,9 @@ internal static class Program
         _taskbarCreated = RegisterWindowMessage("TaskbarCreated");
         _tray = new TrayManager(_hwnd, WM_TRAY_BASE); // icons appear as devices are found
 
+        Toasts.Initialize();
+        Toasts.Clicked += () => Invoke(OpenSettingsWindow);
+
         _state = BuildState();
         _ipc = new IpcServer(() => _state, m => Invoke(() => HandleCommand(m)));
         _ipc.Start();
@@ -80,6 +85,7 @@ internal static class Program
         while (GetMessage(out var msg, 0, 0, 0) > 0) { TranslateMessage(msg); DispatchMessage(msg); }
 
         _tray.RemoveAll();
+        History.Save();
         foreach (var p in Providers) p.DisposeAsync().AsTask().Wait(1000);
         return 0;
     }
@@ -126,7 +132,9 @@ internal static class Program
             .OrderBy(d => d.Info.Category).ThenBy(d => d.Info.Name, StringComparer.CurrentCultureIgnoreCase)
             .Select(d => new DeviceDto(d.Info.Id, d.Info.Name, d.Info.Manufacturer, d.Info.Category, d.Info.CategoryConfidence, d.Connected,
                 d.Battery?.Percent, d.Battery?.Level ?? BatteryLevel.Unknown, d.Battery?.Charge ?? ChargeState.Unknown,
-                d.Battery?.Source, d.Battery?.Timestamp, !_settings.HiddenDevices.Contains(d.Info.Id), !_settings.MutedDevices.Contains(d.Info.Id)))
+                d.Battery?.Source, d.Battery?.Timestamp, !_settings.HiddenDevices.Contains(d.Info.Id), !_settings.MutedDevices.Contains(d.Info.Id),
+                _estimates.GetValueOrDefault(d.Info.Id)?.Percent, _estimates.GetValueOrDefault(d.Info.Id)?.Interpolated ?? false,
+                _estimates.GetValueOrDefault(d.Info.Id)?.Remaining is TimeSpan r ? (int)r.TotalMinutes : null))
             .ToList();
         return new StateDto(Version, devices, _settings.Clone());
     }
@@ -135,7 +143,10 @@ internal static class Program
     static void StateChanged()
     {
         var devices = Registry.Snapshot();
-        _tray?.Update(devices, _settings);
+        History.Record(devices);
+        _estimates = devices.Select(d => (d.Info.Id, Estimate: History.Estimate(d.Info.Id)))
+            .Where(x => x.Estimate != null).ToDictionary(x => x.Id, x => x.Estimate!);
+        _tray?.Update(devices, _settings, _estimates);
         _state = BuildState();
         _ipc?.Broadcast(_state);
         NotifyAlerts(devices);
@@ -148,12 +159,20 @@ internal static class Program
         {
             if (a.Kind == AlertKind.Charged)
             {
-                _tray?.Notify(a.Category, $"{a.DeviceName} – carga completa", "Pode desconectar o carregador.", warning: false, deviceId: a.DeviceId);
+                Notify(a.Category, a.DeviceId, $"{a.DeviceName} – carga completa", "Pode desconectar o carregador.", 100, charging: true, urgent: false);
                 continue;
             }
             var rule = _settings.AlertRules.FirstOrDefault(r => r.Percent == a.Threshold);
-            _tray?.Notify(a.Category, $"{a.DeviceName} – {a.Percent}%", AlertText(rule?.Message), warning: true, deviceId: a.DeviceId);
+            Notify(a.Category, a.DeviceId, $"{a.DeviceName} – {a.Percent}%", AlertText(rule?.Message), a.Percent, charging: false, urgent: rule?.Urgent == true);
         }
+    }
+
+    /// Native toast with the device's icon; the tray balloon when toasts are unavailable.
+    static void Notify(DeviceCategory category, string? deviceId, string title, string text, int? percent, bool charging, bool urgent)
+    {
+        string? iconKey = deviceId != null ? _settings.DeviceIcons.GetValueOrDefault(deviceId) : null;
+        if (!Toasts.Show(title, text, category, iconKey, percent, charging, urgent))
+            _tray?.Notify(category, title, text, warning: !charging, deviceId: deviceId);
     }
 
     static string AlertText(string? message) => string.IsNullOrWhiteSpace(message) ? "Bateria baixa" : message.Trim();
@@ -181,7 +200,7 @@ internal static class Program
                 break;
             case MessageType.TestNotification:
                 int pct = m.Percent ?? _settings.AlertRules.Select(r => r.Percent).DefaultIfEmpty(20).Max();
-                _tray?.Notify(DeviceCategory.Mouse, $"Dispositivo de teste – {pct}%", AlertText(m.Text), warning: true);
+                Notify(DeviceCategory.Mouse, null, $"Dispositivo de teste – {pct}%", AlertText(m.Text), pct, charging: false, urgent: m.Urgent);
                 break;
         }
     }
@@ -210,7 +229,8 @@ internal static class Program
                     while (UiQueue.TryDequeue(out var action)) action();
                     return 0;
                 case WM_TIMER:
-                    _ = Task.Run(RefreshAsync);
+                    // Re-render too: estimates for coarse reporters move between readings.
+                    _ = Task.Run(async () => { await RefreshAsync(); PostMessage(_hwnd, WM_DEVICES_CHANGED, 0, 0); });
                     return 0;
                 case WM_SETTINGCHANGE or WM_DPICHANGED: // light/dark taskbar or scale changed: redraw
                     _tray.Update(Registry.Snapshot(), _settings);
@@ -237,7 +257,7 @@ internal static class Program
             SetMenuDefaultItem(menu, CmdOpen, 0); // bold, like other tray apps
             AppendMenu(menu, MF_SEPARATOR, 0, null);
             foreach (var d in devices)
-                AppendMenu(menu, MF_STRING | MF_GRAYED, 0, $"{d.Info.Name}  —  {TrayManager.Describe(d)}");
+                AppendMenu(menu, MF_STRING | MF_GRAYED, 0, $"{d.Info.Name}  —  {TrayManager.Describe(d, _estimates.GetValueOrDefault(d.Info.Id))}");
             if (devices.Count > 0) AppendMenu(menu, MF_SEPARATOR, 0, null);
 
             foreach (var (st, label) in StyleMenu)

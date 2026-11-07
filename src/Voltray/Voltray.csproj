@@ -19,4 +19,9 @@
     <ProjectReference Include="..\Voltray.Providers.Bluetooth\Voltray.Providers.Bluetooth.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Icon shown by Windows on notifications (registered with the AppUserModelID) -->
+    <Content Include="..\..\assets\voltray-256.png" Link="voltray-256.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

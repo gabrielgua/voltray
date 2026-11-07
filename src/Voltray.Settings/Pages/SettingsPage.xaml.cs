@@ -108,7 +108,10 @@ public sealed partial class SettingsPage : UserControl
 
     // ---- Low-battery alert rules: one row each (limit, message, test, remove) ----
 
-    sealed record RuleRow(NumberBox Percent, TextBox Message);
+    sealed record RuleRow(NumberBox Percent, TextBox Message, ComboBox Priority)
+    {
+        public bool Urgent => Priority.SelectedIndex == 1;
+    }
 
     readonly List<RuleRow> _ruleRows = [];
     bool _rulesEnabled = true;
@@ -124,7 +127,7 @@ public sealed partial class SettingsPage : UserControl
     void ShowRules(List<AlertRule> rules)
     {
         var ordered = rules.OrderByDescending(r => r.Percent).ToList();
-        if (ordered.Count == _ruleRows.Count && ordered.Zip(_ruleRows).All(p => p.First.Percent == (int)p.Second.Percent.Value && (p.First.Message ?? "") == p.Second.Message.Text.Trim()))
+        if (ordered.Count == _ruleRows.Count && ordered.Zip(_ruleRows).All(p => p.First.Percent == (int)p.Second.Percent.Value && (p.First.Message ?? "") == p.Second.Message.Text.Trim() && p.First.Urgent == p.Second.Urgent))
             return;
         RuleList.Children.Clear();
         _ruleRows.Clear();
@@ -141,28 +144,33 @@ public sealed partial class SettingsPage : UserControl
         AutomationProperties.SetName(percent, "Limite do aviso, em porcentagem");
         var message = new TextBox { Text = rule.Message ?? "", PlaceholderText = "Bateria baixa", VerticalAlignment = VerticalAlignment.Center };
         AutomationProperties.SetName(message, "Mensagem do aviso");
-        var row = new RuleRow(percent, message);
+        var priority = new ComboBox { Items = { "Normal", "Urgente" }, SelectedIndex = rule.Urgent ? 1 : 0, VerticalAlignment = VerticalAlignment.Center };
+        AutomationProperties.SetName(priority, "Prioridade do aviso");
+        ToolTipService.SetToolTip(priority, "Urgente pode aparecer mesmo no Não incomodar, se o Windows permitir para o Voltray");
+        var row = new RuleRow(percent, message, priority);
 
         var test = new Button { Content = "Testar", VerticalAlignment = VerticalAlignment.Center };
-        test.Click += (_, _) => _ = App.Host.TestNotificationAsync((int)percent.Value, message.Text);
+        test.Click += (_, _) => _ = App.Host.TestNotificationAsync((int)percent.Value, message.Text, row.Urgent);
         var remove = new Button { Content = new FontIcon { Glyph = "", FontSize = 12 }, VerticalAlignment = VerticalAlignment.Center };
         AutomationProperties.SetName(remove, "Remover aviso");
         ToolTipService.SetToolTip(remove, "Remover aviso");
 
         var grid = new Grid { ColumnSpacing = 8 };
-        foreach (var w in new[] { GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto })
+        foreach (var w in new[] { GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto, GridLength.Auto })
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = w });
         var pctPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
         pctPanel.Children.Add(percent);
         pctPanel.Children.Add(new TextBlock { Text = "%", VerticalAlignment = VerticalAlignment.Center });
         grid.Children.Add(pctPanel);
         Grid.SetColumn(message, 1); grid.Children.Add(message);
-        Grid.SetColumn(test, 2); grid.Children.Add(test);
-        Grid.SetColumn(remove, 3); grid.Children.Add(remove);
+        Grid.SetColumn(priority, 2); grid.Children.Add(priority);
+        Grid.SetColumn(test, 3); grid.Children.Add(test);
+        Grid.SetColumn(remove, 4); grid.Children.Add(remove);
 
         remove.Click += (_, _) => { _ruleRows.Remove(row); RuleList.Children.Remove(grid); SaveRules(); };
         percent.ValueChanged += (_, _) => { if (double.IsNaN(percent.Value)) percent.Value = rule.Percent; else SaveRules(); };
         message.LostFocus += (_, _) => SaveRules();
+        priority.SelectionChanged += (_, _) => SaveRules();
 
         RuleList.Children.Add(grid);
         _ruleRows.Add(row);
@@ -176,6 +184,7 @@ public sealed partial class SettingsPage : UserControl
         {
             Percent = (int)Math.Clamp(r.Percent.Value, 1, 99),
             Message = string.IsNullOrWhiteSpace(r.Message.Text) ? null : r.Message.Text.Trim(),
+            Urgent = r.Urgent,
         }).ToList();
         _ = App.Host.ChangeSettingsAsync(s => s.AlertRules = rules);
     }

@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Voltray.Ipc\Voltray.Ipc.csproj" />
+    <ProjectReference Include="..\Voltray.Rendering\Voltray.Rendering.csproj" />
   </ItemGroup>
 
   <ItemGroup>

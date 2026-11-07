@@ -2,11 +2,11 @@
 
 **Battery levels for all your wireless peripherals, right in the Windows system tray.**
 
-Voltray shows the battery of your mouse, keyboard, headphones, earbuds and controllers next to the Windows clock, with one icon per device category. It is a small native background app with no vendor software required.
+Voltray shows the battery of your mouse, keyboard, headphones, earbuds and controllers next to the Windows clock: one icon per device category, or one per device. It is a small native background app with no vendor software required.
 
 > **Status: early development (v0.1.0-dev).** Logitech HID++ works and is tested on hardware. Bluetooth support is implemented but not yet verified with a real device ([help wanted](#device-support)). See the [roadmap](#roadmap).
 
-![Tray icons in both styles, at 16–32 px, on dark and light taskbars](docs/images/tray-icons.png)
+![The four tray icon styles at 16, 24 and 32 px, on dark and light taskbars](docs/images/tray-icons.png)
 
 | Devices | Settings | Notifications |
 |---|---|---|
@@ -14,12 +14,16 @@ Voltray shows the battery of your mouse, keyboard, headphones, earbuds and contr
 
 ## Features
 
-- **One icon per category** (mouse, keyboard, headphones, earbuds, controller, other). Two mice share the mouse icon, and the icon shows the lowest battery in the group.
-- **Two icon styles:** the battery percentage, or the category symbol with a level bar. Colors change for low, critical and charging.
-- **Hover** shows every device in the category with its level. **Left click** opens the Voltray window; **right click** opens a quick menu.
-- **Settings window** (Windows 11 style, light/dark, Mica): every device with its level, connection state and source; per-device "show in tray"; manual category override; icon style; categories; start with Windows; refresh interval.
-- **Low-battery notifications:** one warning at your threshold (default 20 %) and a last one at 10 %. Never while charging, never twice for the same drop. Optionally, a notice when charging completes. Each device can be muted. Windows Do Not Disturb, including the automatic mode during full-screen games, is respected.
-- **Hide categories** you do not care about.
+- **Tray icons that tell devices apart.** Every icon shows the device's symbol ([Hugeicons](https://hugeicons.com), stroke rounded). Choose one of four styles:
+  - **Bar:** rounded level bar below the symbol.
+  - **Vertical bar:** rounded level bar beside the symbol.
+  - **Colored:** the symbol itself turns green, yellow, orange or red with the level.
+  - **Number:** symbol on top, percentage below in a pixel font that stays readable at 16 px. The "%" sign and level-colored digits are optional.
+- **One icon per category or one per device.** Per category, two mice share the mouse icon and it shows the lowest battery. Per device, each one gets its own icon, and you can pick that icon from 22 symbols.
+- **Disconnected devices** stay in the tray dimmed with their last level, or are hidden. They are always listed in the window.
+- **Hover** shows the devices and their levels. **Left click** opens the Voltray window; **right click** opens a quick menu (icon style, hide an icon, refresh).
+- **Low-battery notifications:** any number of rules, each with its own limit and message, plus a test button. Each rule warns once per discharge; crossing several at once shows only the lowest. Never while charging. Optionally, a notice when charging completes. Each device can be muted. Windows Do Not Disturb, including the automatic mode during full-screen games, is respected.
+- **Settings window** (Windows 11 style, light/dark, acrylic): every device with its level, connection state and source; per-device "show in tray", notifications, category and icon; start with Windows; refresh interval.
 - **Coexists with vendor software.** Logitech devices are read directly over HID++, with or without G HUB running.
 - **Tiny footprint in the background:** ~5 MB executable, ~9 MB private memory, ~0 % CPU when idle. The settings window is a separate process that exits when closed.
 
@@ -56,7 +60,7 @@ Requirements: Windows 10 2004 (19041)+ or Windows 11, the [.NET 10 SDK](https://
 
 ### Why is my icon hidden?
 
-New tray icons go to the overflow (^) area by default. Windows leaves that choice to you, and Voltray does not override it. To pin an icon, open **Settings → Personalization → Taskbar → Other system tray icons** and turn Voltray on. Each category has its own entry, so you can pin the mouse icon and leave the others hidden.
+New tray icons go to the overflow (^) area by default. Windows leaves that choice to you, and Voltray does not override it. To pin an icon, open **Settings → Personalization → Taskbar → Other system tray icons** and turn Voltray on. Each Voltray icon (each category, or each device) has its own entry there.
 
 ## Architecture
 
@@ -64,7 +68,9 @@ New tray icons go to the overflow (^) area by default. Windows leaves that choic
 Voltray.exe (background, Win32 + NativeAOT, ~5 MB)
  ├─ Providers ── Logitech HID++ · Bluetooth · ...   report devices + readings
  ├─ DeviceRegistry ── classification, user overrides, last-known state
- └─ TrayManager ── one icon per category, tooltips, menus
+ ├─ BatteryAlerts ── low-battery rules
+ └─ TrayManager ── icons per category or per device, tooltips, menus
+       └─ Voltray.Rendering ── tray icon renderer (also used by the window)
 
 Voltray.Settings.exe (WinUI 3, started on demand, exits when closed) ◄── named pipe ──► Voltray.exe
 ```
@@ -73,10 +79,9 @@ The settings window runs as a separate process because WinUI 3 keeps ~100 MB in 
 
 ## Roadmap
 
-- **v0.1:** Logitech HID++ ✅, Bluetooth HFP + BLE battery 🧪, settings window ✅, start with Windows ✅, low-battery notifications ✅, releases on GitHub.
-- **v0.2:** Xbox / GameInput, DualSense, 7-day history, device nicknames, diagnostics export.
-- **v0.3:** Razer, SteelSeries, HyperX, Corsair providers.
-- **Later:** rich hover cards, winget, code signing, localization (en / pt-BR), external provider plugins.
+- **Done:** Logitech HID++, Bluetooth HFP + BLE (untested on hardware), settings window, start with Windows, notification rules, four icon styles, per-device tray icons.
+- **Next:** battery history and estimated time remaining, smoother levels for devices that report in 10 % steps, native Windows notifications with the device image and an "urgent" priority, a better icon picker.
+- **Later:** a compact window centered on the device list, a quick tray panel, Xbox / PlayStation / Switch controllers, Razer and SteelSeries receivers, a 7-day history chart, English, installer and winget.
 
 ## Contributing
 
@@ -84,4 +89,4 @@ Contributions are welcome, especially new device providers and device reports. R
 
 ## License
 
-[MIT](LICENSE). Voltray is not affiliated with Logitech or any other device manufacturer. Product names are trademarks of their owners.
+[MIT](LICENSE). Icons from the [Hugeicons](https://hugeicons.com) free set, MIT ([license](assets/icons/LICENSE-hugeicons.md)). Voltray is not affiliated with Logitech or any other device manufacturer. Product names are trademarks of their owners.
