@@ -51,6 +51,8 @@ internal static unsafe partial class Win32
     [LibraryImport("user32.dll")] public static partial void PostQuitMessage(int code);
     [LibraryImport("user32.dll", EntryPoint = "RegisterWindowMessageW", StringMarshalling = StringMarshalling.Utf16)] public static partial uint RegisterWindowMessage(string s);
     [LibraryImport("user32.dll")] public static partial nint SetTimer(nint h, nint id, uint ms, nint fn);
+    [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static partial bool KillTimer(nint h, nint id);
+    public const uint WM_DEVICECHANGE = 0x0219, DBT_DEVNODES_CHANGED = 0x0007;
     [LibraryImport("user32.dll")] public static partial nint CreatePopupMenu();
     [LibraryImport("user32.dll", EntryPoint = "AppendMenuW", StringMarshalling = StringMarshalling.Utf16)] [return: MarshalAs(UnmanagedType.Bool)] public static partial bool AppendMenu(nint m, uint f, nint id, string? text);
     [LibraryImport("user32.dll")] public static partial int TrackPopupMenu(nint m, uint f, int x, int y, int r, nint h, nint rect);

@@ -22,23 +22,47 @@ public sealed class LogitechProvider : IBatteryProvider
     public async Task StartAsync(IDeviceSink sink, CancellationToken ct)
     {
         _sink = sink;
-        var endpoints = HidppTransport.Discover();
-        Log.Info($"logitech: {endpoints.Count} HID++ endpoint(s): {string.Join(", ", endpoints.Select(e => $"{e.Pid:X4}{(e.ShortPath is null ? " (no short)" : "")}"))}");
+        await OpenNewEndpointsAsync();
+    }
+
+    /// Opens receivers / cables that appeared since the last look (a mouse plugged in to charge
+    /// shows up as its own USB endpoint) and probes their slots.
+    async Task OpenNewEndpointsAsync()
+    {
+        var open = Snapshot();
+        var endpoints = HidppTransport.Discover().Where(e => open.All(t => t.Endpoint.LongPath != e.LongPath)).ToList();
+        if (endpoints.Count == 0) return;
+        Log.Info($"logitech: {endpoints.Count} new HID++ endpoint(s): {string.Join(", ", endpoints.Select(e => $"{e.Pid:X4}{(e.ShortPath is null ? " (no short)" : "")}"))}");
         foreach (var ep in endpoints)
         {
             HidppTransport t;
             try { t = new HidppTransport(ep); }
             catch (IOException e) { Log.Error($"cannot open {ep.LongPath}", e); continue; }
-            _transports.Add(t);
+            lock (_transports) _transports.Add(t);
             t.Notification += r => _ = OnNotification(t, r);
             foreach (var slot in Slots) await ProbeAsync(t, slot);
         }
     }
 
+    List<HidppTransport> Snapshot() { lock (_transports) return [.. _transports]; }
+
+    /// The endpoint is gone (receiver or cable unplugged): forget it and its devices.
+    void Drop(HidppTransport t)
+    {
+        lock (_transports) if (!_transports.Remove(t)) return;
+        Log.Info($"logitech: endpoint {t.Endpoint.Pid:X4} removed");
+        foreach (var key in _devices.Keys.Where(k => k.Item1 == t).ToList())
+            if (_devices.TryRemove(key, out var gone) && _devices.Values.All(v => v.Id != gone.Id)) _sink!.Disconnected(gone.Id);
+        t.Dispose();
+    }
+
     async Task ProbeAsync(HidppTransport t, byte slot)
     {
         var d = new HidppDevice(t, slot);
-        if (!await d.PingAsync())
+        bool alive;
+        try { alive = await d.PingAsync(); }
+        catch (IOException) { Drop(t); return; }
+        if (!alive)
         {
             // HID++ 1.0 error 0x08 (unknown device) = nothing paired in this slot. Anything else
             // (0x09 resource error = paired but off, timeout = asleep) is worth knowing.
@@ -50,6 +74,7 @@ public sealed class LogitechProvider : IBatteryProvider
         {
             await d.LoadIdentityAsync();
             string id = $"logitech:{d.UnitId ?? $"{t.Endpoint.Pid:X4}-{slot:X2}"}";
+            if (_devices.Any(kv => kv.Key.Item1 == t && kv.Value.Id == id)) return; // a cable-connected device answers on every slot
             _devices[(t, slot)] = (d, id);
             Log.Info($"logitech: slot {slot} = {d.Name} ({d.Kind}, HID++ {d.ProtocolVersion:0.0}) id={id}");
             _sink!.Upsert(new DeviceInfo(id, d.Name ?? "Logitech device", "Logitech", CategoryOf(d.Kind),
@@ -57,6 +82,7 @@ public sealed class LogitechProvider : IBatteryProvider
             await ReadAsync(d, id);
         }
         catch (Exception e) when (e is HidppException or TimeoutException) { Log.Error($"logitech: slot {slot} probe failed", e); }
+        catch (IOException) { Drop(t); }
     }
 
     async Task ReadAsync(HidppDevice d, string id)
@@ -66,6 +92,7 @@ public sealed class LogitechProvider : IBatteryProvider
             if (await d.ReadBatteryAsync() is BatteryReading b) _sink!.Report(id, b);
         }
         catch (Exception e) when (e is HidppException or TimeoutException) { _sink!.Disconnected(id); }
+        catch (IOException) { Drop(d.Transport); }
     }
 
     async Task OnNotification(HidppTransport t, byte[] r)
@@ -88,11 +115,12 @@ public sealed class LogitechProvider : IBatteryProvider
 
     public async Task RefreshAsync(CancellationToken ct)
     {
-        foreach (var (d, id) in _devices.Values) await ReadAsync(d, id);
+        foreach (var (d, id) in _devices.Values.ToList()) await ReadAsync(d, id);
+        await OpenNewEndpointsAsync();
         // Devices that were asleep or off at startup: empty slots answer instantly, so this is cheap.
-        foreach (var t in _transports)
+        foreach (var t in Snapshot())
             foreach (var slot in Slots)
-                if (!_devices.ContainsKey((t, slot))) await ProbeAsync(t, slot);
+                if (Snapshot().Contains(t) && !_devices.ContainsKey((t, slot))) await ProbeAsync(t, slot);
     }
 
     static DeviceCategory CategoryOf(HidppKind kind) => kind switch
@@ -105,7 +133,7 @@ public sealed class LogitechProvider : IBatteryProvider
 
     public ValueTask DisposeAsync()
     {
-        foreach (var t in _transports) t.Dispose();
+        foreach (var t in Snapshot()) t.Dispose();
         return ValueTask.CompletedTask;
     }
 }

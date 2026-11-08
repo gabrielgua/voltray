@@ -28,6 +28,9 @@ public enum IconStyle
 /// One tray icon per device category (devices of a category share it), or one per device.
 public enum TrayMode { PerCategory, PerDevice }
 
+/// Animation on a charging device's card in the settings window.
+public enum ChargingAnimation { Stream, Bubbles, Sparks }
+
 /// What a disconnected device looks like in the tray (it always stays listed in the window).
 public enum DisconnectedInTray { Dim, Hide }
 
@@ -63,6 +66,8 @@ public sealed class Settings
     public DisconnectedInTray Disconnected { get; set; } = DisconnectedInTray.Dim;
     /// Icon picked per device (key into Voltray.Core.Icons.DeviceIcons); missing = category icon.
     public Dictionary<string, string> DeviceIcons { get; set; } = [];
+
+    public ChargingAnimation ChargingAnimation { get; set; } = ChargingAnimation.Stream;
 
     public bool NotifyLowBattery { get; set; } = true;
     public List<AlertRule> AlertRules { get; set; } = DefaultAlertRules();

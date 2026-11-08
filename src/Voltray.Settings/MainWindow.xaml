@@ -8,12 +8,14 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="48" />
+            <RowDefinition Height="32" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <!-- Custom title bar (content extends into it) -->
-        <Grid x:Name="AppTitleBar" Padding="16,0,0,0" ColumnSpacing="12">
+        <Grid x:Name="AppTitleBar" Padding="12,0,0,0" ColumnSpacing="10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -22,51 +24,38 @@
             <TextBlock Grid.Column="1" Text="Voltray" VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" />
         </Grid>
 
-        <NavigationView
-            x:Name="Nav"
-            Grid.Row="1"
-            PaneDisplayMode="Left"
-            IsBackButtonVisible="Collapsed"
-            IsSettingsVisible="False"
-            IsPaneToggleButtonVisible="False"
-            OpenPaneLength="220"
-            SelectionChanged="OnNavSelectionChanged">
-            <NavigationView.MenuItems>
-                <NavigationViewItem Content="Dispositivos" Tag="devices">
-                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE772;" /></NavigationViewItem.Icon>
-                </NavigationViewItem>
-                <NavigationViewItem Content="Configurações" Tag="settings">
-                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE713;" /></NavigationViewItem.Icon>
-                </NavigationViewItem>
-            </NavigationView.MenuItems>
-            <NavigationView.FooterMenuItems>
-                <NavigationViewItem Content="Sobre" Tag="about">
-                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE946;" /></NavigationViewItem.Icon>
-                </NavigationViewItem>
-            </NavigationView.FooterMenuItems>
+        <!-- Settings / About header: back to the device list -->
+        <Grid x:Name="SubHeader" Grid.Row="1" Padding="8,4,16,8" ColumnSpacing="8" Visibility="Collapsed">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Button x:Name="BackButton" Width="36" Height="32" Padding="0" Background="Transparent" BorderThickness="0" Click="OnBackClick"
+                    ToolTipService.ToolTip="Voltar" AutomationProperties.Name="Voltar">
+                <FontIcon Glyph="&#xE72B;" FontSize="16" />
+            </Button>
+            <TextBlock x:Name="SubTitle" Grid.Column="1" FontSize="18" Style="{StaticResource SubtitleTextBlockStyle}" VerticalAlignment="Center" />
+            <HyperlinkButton x:Name="AboutLink" Grid.Column="2" Content="Sobre" Click="OnAboutClick" VerticalAlignment="Center" />
+        </Grid>
 
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-                <InfoBar
-                    x:Name="HostInfoBar"
-                    Margin="32,16,32,0"
-                    Severity="Warning"
-                    IsClosable="False"
-                    Title="O Voltray não está em execução"
-                    Message="Os níveis de bateria são lidos pelo app em segundo plano.">
-                    <InfoBar.ActionButton>
-                        <Button Content="Iniciar Voltray" Click="OnStartHostClick" />
-                    </InfoBar.ActionButton>
-                </InfoBar>
-                <ContentControl
-                    x:Name="PageHost"
-                    Grid.Row="1"
-                    HorizontalContentAlignment="Stretch"
-                    VerticalContentAlignment="Stretch" />
-            </Grid>
-        </NavigationView>
+        <InfoBar
+            x:Name="HostInfoBar"
+            Grid.Row="2"
+            Margin="8,0,8,8"
+            Severity="Warning"
+            IsClosable="False"
+            Title="O Voltray não está em execução"
+            Message="Os níveis de bateria são lidos pelo app em segundo plano.">
+            <InfoBar.ActionButton>
+                <Button Content="Iniciar Voltray" Click="OnStartHostClick" />
+            </InfoBar.ActionButton>
+        </InfoBar>
+
+        <ContentControl
+            x:Name="PageHost"
+            Grid.Row="3"
+            HorizontalContentAlignment="Stretch"
+            VerticalContentAlignment="Stretch" />
     </Grid>
 </Window>

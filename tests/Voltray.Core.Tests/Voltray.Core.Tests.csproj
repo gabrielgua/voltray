@@ -20,6 +20,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Voltray.Core\Voltray.Core.csproj" />
     <ProjectReference Include="..\..\src\Voltray.Providers.Bluetooth\Voltray.Providers.Bluetooth.csproj" />
+    <ProjectReference Include="..\..\src\Voltray.Providers.Titorion\Voltray.Providers.Titorion.csproj" />
   </ItemGroup>
 
 </Project>

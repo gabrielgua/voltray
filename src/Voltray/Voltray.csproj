@@ -17,6 +17,7 @@
     <ProjectReference Include="..\Voltray.Rendering\Voltray.Rendering.csproj" />
     <ProjectReference Include="..\Voltray.Providers.Logitech\Voltray.Providers.Logitech.csproj" />
     <ProjectReference Include="..\Voltray.Providers.Bluetooth\Voltray.Providers.Bluetooth.csproj" />
+    <ProjectReference Include="..\Voltray.Providers.Titorion\Voltray.Providers.Titorion.csproj" />
   </ItemGroup>
 
   <ItemGroup>

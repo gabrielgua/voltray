@@ -5,6 +5,7 @@ using Voltray.Core;
 using Voltray.Ipc;
 using Voltray.Providers.Bluetooth;
 using Voltray.Providers.Logitech;
+using Voltray.Providers.Titorion;
 using Voltray.Rendering;
 using Voltray.Tray;
 using static Voltray.Interop.Win32;
@@ -16,7 +17,7 @@ namespace Voltray;
 internal static class Program
 {
     const uint WM_DEVICES_CHANGED = WM_APP + 1, WM_INVOKE = WM_APP + 2, WM_TRAY_BASE = WM_APP + 0x10;
-    const nint TimerRefresh = 1;
+    const nint TimerRefresh = 1, TimerDeviceChange = 2;
     const int CmdRefresh = 1, CmdExit = 2, CmdHideCategory = 5, CmdShowAll = 6, CmdOpen = 7, CmdStyleBase = 100;
 
     static readonly (IconStyle, string)[] StyleMenu =
@@ -30,7 +31,7 @@ internal static class Program
     static int _updatePending;
     static Settings _settings = new();
     static readonly DeviceRegistry Registry = new();
-    static readonly List<IBatteryProvider> Providers = [new LogitechProvider(), new BluetoothProvider()];
+    static readonly List<IBatteryProvider> Providers = [new LogitechProvider(), new BluetoothProvider(), new TitorionProvider()];
     static readonly ConcurrentQueue<Action> UiQueue = new();
     static readonly BatteryAlerts Alerts = new();
     static readonly HistoryStore History = new();
@@ -228,7 +229,13 @@ internal static class Program
                 case WM_INVOKE:
                     while (UiQueue.TryDequeue(out var action)) action();
                     return 0;
+                case WM_DEVICECHANGE when wParam == DBT_DEVNODES_CHANGED:
+                    // A USB device came or went (receiver swapped, cable plugged in to charge): look
+                    // again once the burst of notifications settles.
+                    SetTimer(_hwnd, TimerDeviceChange, 1500, 0);
+                    break;
                 case WM_TIMER:
+                    if (wParam == TimerDeviceChange) KillTimer(_hwnd, TimerDeviceChange);
                     // Re-render too: estimates for coarse reporters move between readings.
                     _ = Task.Run(async () => { await RefreshAsync(); PostMessage(_hwnd, WM_DEVICES_CHANGED, 0, 0); });
                     return 0;

@@ -7,12 +7,16 @@ namespace Voltray.Settings;
 public partial class App : Application
 {
     public static HostConnection Host { get; private set; } = null!;
+    /// --demo [Stream|Bubbles|Sparks]: show sample devices instead of the host's (screenshots, trying animations).
+    public static bool Demo { get; } = Environment.GetCommandLineArgs().Contains("--demo");
 
     MainWindow? _window;
 
     public App()
     {
         InitializeComponent();
+        if (Environment.GetCommandLineArgs() is var a && Array.IndexOf(a, "--theme") is int t && t >= 0 && t + 1 < a.Length) // screenshots
+            RequestedTheme = a[t + 1] == "light" ? ApplicationTheme.Light : ApplicationTheme.Dark;
         UnhandledException += (_, e) => Log.Error("settings window", e.Exception);
     }
 

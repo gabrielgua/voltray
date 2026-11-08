@@ -34,6 +34,7 @@ Voltray only shows what a device reports. Some devices never report battery to t
 | Source | Status | Notes |
 |---|---|---|
 | Logitech LIGHTSPEED / Unifying / Bolt receivers (HID++ 2.0) | ✅ Working | Exact percentage on newer devices (feature 0x1004). Estimated from voltage on older ones. Tested: PRO X Superlight 2. |
+| Titorion 2.4 GHz keyboards (receiver 056D:C077 / C088) | ✅ Working | Exact percentage and charging state, polled (the same read-only query as the vendor web app). |
 | Bluetooth Classic headsets (HFP) | 🧪 Implemented, untested | Same level Windows shows in Settings, pushed on change. |
 | Bluetooth LE | 🧪 Implemented, untested | Windows-read level, or the GATT Battery Service with notifications as fallback. |
 | Xbox controllers (GameInput) | 🗓 Planned | |

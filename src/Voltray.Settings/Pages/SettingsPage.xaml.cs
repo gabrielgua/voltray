@@ -33,6 +33,7 @@ public sealed partial class SettingsPage : UserControl
             var s = state.Settings;
             IconStyleBox.SelectedItem = IconStyleBox.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == s.IconStyle.ToString())
                 ?? IconStyleBox.Items[0];
+            SelectByTag(ChargingAnimationBox, s.ChargingAnimation.ToString());
             PercentSignSwitch.IsOn = s.ShowPercentSign;
             ColorNumberSwitch.IsOn = s.ColorNumber;
             AutostartSwitch.IsOn = s.StartWithWindows;
@@ -54,6 +55,12 @@ public sealed partial class SettingsPage : UserControl
     {
         if (_applying || IconStyleBox.SelectedItem is not ComboBoxItem { Tag: string tag } || !Enum.TryParse<IconStyle>(tag, out var style)) return;
         _ = App.Host.ChangeSettingsAsync(s => s.IconStyle = style);
+    }
+
+    void OnChargingAnimationChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_applying || ChargingAnimationBox.SelectedItem is not ComboBoxItem { Tag: string tag } || !Enum.TryParse<ChargingAnimation>(tag, out var a)) return;
+        _ = App.Host.ChangeSettingsAsync(s => s.ChargingAnimation = a);
     }
 
     void OnPercentSignToggled(object sender, RoutedEventArgs e)

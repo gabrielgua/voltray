@@ -52,6 +52,39 @@ public sealed partial class DeviceViewModel : INotifyPropertyChanged
         : _dto.Percent is <= 20 ? "SystemFillColorCautionBrush"
         : "AccentFillColorDefaultBrush"];
 
+    // ---- compact list ----
+
+    public bool IsConnected => _dto.Connected;
+    public bool IsCharging => _dto.Connected && _dto.Charge == ChargeState.Charging;
+    int? Level => _dto.Interpolated ? _dto.EstimatedPercent : _dto.Percent;
+
+    /// How full the card background is (0..1); devices that only report a level word get a rough fill.
+    public double Fraction => (Level ?? _dto.Level switch
+    {
+        BatteryLevel.Full => 100,
+        BatteryLevel.Good => 60,
+        BatteryLevel.Low => 20,
+        BatteryLevel.Critical => 8,
+        _ => 0,
+    }) / 100.0;
+
+    /// 0 green, 1 yellow, 2 orange, 3 red — same steps as the tray icon.
+    public int Step => (int)Math.Round(Fraction * 100) switch { > 50 => 0, > 20 => 1, > 10 => 2, _ => 3 };
+
+    /// The big number ("63"), or a word when the device reports no percentage.
+    public string NumberText => Level is int p ? p.ToString() : PercentText;
+    public bool HasNumber => Level is int;
+
+    /// "~14 h restantes", "Carregando", "Desconectado · visto há 2 dias".
+    public string CompactDetail =>
+        !_dto.Connected ? "Desconectado" + (_dto.UpdatedAt is { } t ? " · visto " + Ago(t) : "")
+        : IsCharging ? "Carregando"
+        : _dto.RemainingMinutes is int min ? Remaining(min) + " restantes"
+        : _dto.UpdatedAt is { } u ? "Atualizado " + Ago(u)
+        : _dto.Manufacturer ?? "";
+
+    public DateTimeOffset? UpdatedAt => _dto.UpdatedAt;
+
     /// "Logitech · HID++ 0x1004 · há 2 min" or "Desconectado · visto há 3 h".
     public string Detail
     {
@@ -100,7 +133,7 @@ public sealed partial class DeviceViewModel : INotifyPropertyChanged
             OnChanged(p);
     }
 
-    static string Ago(DateTimeOffset t)
+    public static string Ago(DateTimeOffset t)
     {
         var d = DateTimeOffset.Now - t;
         return d.TotalMinutes < 1 ? "agora" : d.TotalHours < 1 ? $"há {(int)d.TotalMinutes} min" : d.TotalDays < 1 ? $"há {(int)d.TotalHours} h" : $"em {t:dd/MM}";

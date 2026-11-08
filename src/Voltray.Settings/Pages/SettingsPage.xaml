@@ -4,8 +4,29 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <ScrollViewer>
-        <StackPanel MaxWidth="1000" Padding="32,24,32,32" Spacing="4">
-            <TextBlock Text="Configurações" Style="{StaticResource TitleTextBlockStyle}" />
+        <StackPanel MaxWidth="1000" Padding="24,4,24,24" Spacing="4">
+            <TextBlock Text="Janela" Style="{StaticResource SectionHeaderStyle}" Margin="2,0,0,8" />
+
+            <Border Style="{StaticResource CardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE945;" Style="{StaticResource CardIconStyle}" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Animação ao carregar" />
+                        <TextBlock Text="No card do dispositivo que está carregando" Style="{StaticResource SecondaryTextStyle}" />
+                    </StackPanel>
+                    <ComboBox x:Name="ChargingAnimationBox" Grid.Column="2" MinWidth="200" VerticalAlignment="Center" SelectionChanged="OnChargingAnimationChanged"
+                              AutomationProperties.Name="Animação ao carregar">
+                        <ComboBoxItem Content="Correnteza" Tag="Stream" />
+                        <ComboBoxItem Content="Bolhas" Tag="Bubbles" />
+                        <ComboBoxItem Content="Faíscas" Tag="Sparks" />
+                    </ComboBox>
+                </Grid>
+            </Border>
 
             <TextBlock Text="Bandeja do sistema" Style="{StaticResource SectionHeaderStyle}" />
 

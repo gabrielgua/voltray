@@ -12,68 +12,11 @@ using Voltray.Settings.ViewModels;
 
 namespace Voltray.Settings.Pages;
 
-public sealed partial class DevicesPage : UserControl
+public static class DeviceMenu
 {
-    readonly ObservableCollection<CategoryGroup> _groups = [];
-    readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromMinutes(1) };
-
-    public DevicesPage()
+    /// Device menu (opened by clicking its card): tray, notifications, category and tray icon.
+    public static void Show(DeviceViewModel vm, FrameworkElement button)
     {
-        InitializeComponent();
-        GroupList.ItemsSource = _groups;
-        App.Host.StateReceived += Apply;
-        if (App.Host.State is { } s) Apply(s);
-        _clock.Tick += (_, _) => { foreach (var d in _groups.SelectMany(g => g.Devices)) d.RefreshText(); }; // "há N min"
-        _clock.Start();
-        Unloaded += (_, _) => { App.Host.StateReceived -= Apply; _clock.Stop(); };
-    }
-
-    /// Syncs groups and cards with the host state in place (no rebuild, so focus and toggles survive).
-    void Apply(StateDto state)
-    {
-        var byCategory = state.Devices.GroupBy(d => d.Category).ToDictionary(g => g.Key, g => g.ToList());
-
-        foreach (var g in _groups.Where(g => !byCategory.ContainsKey(g.Category)).ToList()) _groups.Remove(g);
-        foreach (var category in Categories.All.Where(byCategory.ContainsKey))
-        {
-            var group = _groups.FirstOrDefault(g => g.Category == category);
-            if (group is null)
-            {
-                group = new CategoryGroup(category);
-                int index = _groups.Count(g => g.Category < category);
-                _groups.Insert(index, group);
-            }
-            var dtos = byCategory[category];
-            foreach (var gone in group.Devices.Where(d => dtos.All(x => x.Id != d.Id)).ToList()) group.Devices.Remove(gone);
-            for (int i = 0; i < dtos.Count; i++)
-            {
-                var vm = group.Devices.FirstOrDefault(d => d.Id == dtos[i].Id);
-                if (vm is null)
-                {
-                    vm = new DeviceViewModel(dtos[i]);
-                    vm.ShownInTrayChanged += OnShownInTrayChanged;
-                    group.Devices.Insert(i, vm);
-                }
-                else
-                {
-                    vm.Update(dtos[i]);
-                    int at = group.Devices.IndexOf(vm);
-                    if (at != i) group.Devices.Move(at, i);
-                }
-            }
-        }
-        EmptyState.Visibility = state.Devices.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    void OnShownInTrayChanged(DeviceViewModel vm, bool shown) =>
-        _ = App.Host.ChangeSettingsAsync(s => { if (shown) s.HiddenDevices.Remove(vm.Id); else s.HiddenDevices.Add(vm.Id); });
-
-    void OnRefreshClick(object sender, RoutedEventArgs e) => _ = App.Host.RefreshAsync();
-
-    /// "..." menu: notifications for this device, and its category (or back to automatic).
-    void OnMoreClick(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button { Tag: DeviceViewModel vm } button) return;
         var category = new MenuFlyoutSubItem { Text = "Categoria", Icon = new FontIcon { Glyph = "" } };
         // Plain items with a ✓ on the right for the current choice: radio items would add an
         // empty marker column that pushes every icon and label to the right.
@@ -99,7 +42,10 @@ public sealed partial class DevicesPage : UserControl
             bool on = notify.IsChecked;
             _ = App.Host.ChangeSettingsAsync(s => { if (on) s.MutedDevices.Remove(vm.Id); else s.MutedDevices.Add(vm.Id); });
         };
+        var tray = new ToggleMenuFlyoutItem { Text = "Mostrar na bandeja", IsChecked = vm.ShownInTray, Icon = new FontIcon { Glyph = "" } };
+        tray.Click += (_, _) => vm.ShownInTray = tray.IsChecked;
         var menu = new MenuFlyout();
+        menu.Items.Add(tray);
         menu.Items.Add(notify);
         menu.Items.Add(category);
         menu.Items.Add(icon);
@@ -115,13 +61,13 @@ public sealed partial class DevicesPage : UserControl
 
     /// A Hugeicons symbol (same as the tray icons) as vector geometry in the current text colour,
     /// so it stays sharp at any scale and follows the theme.
-    static IconElement VectorIcon(string path, double size)
+    public static IconElement VectorIcon(string path, double size)
     {
         try
         {
             return new PathIcon
             {
-                Data = (Geometry)XamlBindingHelper.ConvertValue(typeof(Geometry), IconOutline.Markup(path, size)),
+                Data = (Geometry)XamlBindingHelper.ConvertValue(typeof(Geometry), IconOutline.Markup(path, size, size <= 20 ? 1.75 : 1.5)),
                 Width = size, Height = size,
             };
         }
@@ -129,18 +75,20 @@ public sealed partial class DevicesPage : UserControl
     }
 
     /// Grid of tray icons for one device, anchored to its "..." button.
-    void ShowIconPicker(DeviceViewModel vm, FrameworkElement anchor)
+    static void ShowIconPicker(DeviceViewModel vm, FrameworkElement anchor)
     {
         var settings = App.Host.State?.Settings;
         string? current = settings?.DeviceIcons.GetValueOrDefault(vm.Id);
-        var hover = new TextBlock { Text = " ", Style = (Style)Application.Current.Resources["SecondaryTextStyle"], TextTrimming = TextTrimming.CharacterEllipsis };
+        string selectedLabel = current is not null && DeviceIcons.Find(current) is { } chosen ? chosen.Label : "Da categoria";
+        var hover = new TextBlock { Text = selectedLabel, Style = (Style)Application.Current.Resources["SecondaryTextStyle"], TextTrimming = TextTrimming.CharacterEllipsis };
         var grid = new GridView
         {
-            SelectionMode = ListViewSelectionMode.Single, IsItemClickEnabled = true, MaxHeight = 300,
-            Padding = new Thickness(0), Margin = new Thickness(-2, 0, -6, 0),
+            SelectionMode = ListViewSelectionMode.Single, IsItemClickEnabled = true, MaxHeight = 340,
+            Padding = new Thickness(0), HorizontalAlignment = HorizontalAlignment.Center, // 5 tiles of 60 + 4 spacing fill the 324 panel
         };
         AutomationProperties.SetName(grid, "Ícones");
-        var flyout = new Flyout { Placement = Microsoft.UI.Xaml.Controls.Primitives.FlyoutPlacementMode.BottomEdgeAlignedRight };
+        // Not constrained to the window: the compact window is narrower and shorter than the picker.
+        var flyout = new Flyout { Placement = Microsoft.UI.Xaml.Controls.Primitives.FlyoutPlacementMode.Bottom, ShouldConstrainToRootBounds = false };
 
         // (key, label, path): key null = the category's icon
         var options = new List<(string? Key, string Label, string Path)> { (null, "Da categoria", CategoryIcons.For(vm.Category)) };
@@ -152,7 +100,7 @@ public sealed partial class DevicesPage : UserControl
             foreach (var o in options.Where(o => query.Length == 0 || o.Label.Contains(query, StringComparison.CurrentCultureIgnoreCase)
                                                  || (o.Key?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)))
             {
-                var tile = new Grid { Width = 56, Height = 56, Tag = o.Key ?? "" };
+                var tile = new Grid { Width = 60, Height = 60, Tag = o.Key ?? "" };
                 tile.Children.Add(new Viewbox { Width = 28, Height = 28, Child = VectorIcon(o.Path, 28) });
                 if (o.Key is null)
                     tile.Children.Add(new TextBlock
@@ -165,6 +113,7 @@ public sealed partial class DevicesPage : UserControl
                 AutomationProperties.SetName(tile, o.Label);
                 string label = o.Label;
                 tile.PointerEntered += (_, _) => hover.Text = label;
+                tile.PointerExited += (_, _) => hover.Text = selectedLabel;
                 tile.GotFocus += (_, _) => hover.Text = label;
                 grid.Items.Add(tile);
                 if (o.Key == current) grid.SelectedItem = tile;
@@ -183,7 +132,7 @@ public sealed partial class DevicesPage : UserControl
         search.TextChanged += (_, _) => Fill(search.Text.Trim());
         search.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Down && grid.Items.Count > 0) { grid.Focus(FocusState.Keyboard); e.Handled = true; } };
 
-        var panel = new StackPanel { Width = 384, Spacing = 8 };
+        var panel = new StackPanel { Width = 324, Spacing = 8 };
         panel.Children.Add(new TextBlock { Text = "Ícone na bandeja", Style = (Style)Application.Current.Resources["BodyStrongTextBlockStyle"] });
         if (settings?.TrayMode == TrayMode.PerCategory)
             panel.Children.Add(new TextBlock
