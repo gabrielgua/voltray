@@ -63,7 +63,7 @@ public sealed class Settings
     public bool StartWithWindows { get; set; }
 
     public TrayMode TrayMode { get; set; } = TrayMode.PerCategory;
-    public DisconnectedInTray Disconnected { get; set; } = DisconnectedInTray.Dim;
+    public DisconnectedInTray Disconnected { get; set; } = DisconnectedInTray.Hide;
     /// Icon picked per device (key into Voltray.Core.Icons.DeviceIcons); missing = category icon.
     public Dictionary<string, string> DeviceIcons { get; set; } = [];
 

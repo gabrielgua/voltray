@@ -2,7 +2,9 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Voltray.Core;
+using Voltray.Core.Icons;
 using Voltray.Ipc;
+using Voltray.Panel;
 using Voltray.Providers.Bluetooth;
 using Voltray.Providers.Logitech;
 using Voltray.Providers.Titorion;
@@ -49,10 +51,12 @@ internal static class Program
             catch (Exception e) { Log.Error("icon preview", e); return 1; }
         }
 
+        if (args is ["--panel-preview", var at, ..]) return PanelPreview(at, args.Length > 2 ? args[2] : null);
+
         using var single = new Mutex(true, @"Local\Voltray", out bool first);
         if (!first)
         {
-            if (!args.Contains("--background")) OpenSettingsWindow(); // second launch from Start menu = "show me Voltray"
+            if (!args.Contains("--background")) OpenSettingsWindow(null); // second launch from Start menu = "show me Voltray"
             return 0;
         }
 
@@ -71,8 +75,18 @@ internal static class Program
         _taskbarCreated = RegisterWindowMessage("TaskbarCreated");
         _tray = new TrayManager(_hwnd, WM_TRAY_BASE); // icons appear as devices are found
 
+        TrayPanel.Init(new PanelHost
+        {
+            Devices = PanelDevices,
+            Refresh = RefreshAndRedraw,
+            OpenWindow = OpenSettingsWindow,
+            SetInTray = (id, on) => ChangeSettings(s => { if (on) s.HiddenDevices.Remove(id); else s.HiddenDevices.Add(id); }),
+            SetNotify = (id, on) => ChangeSettings(s => { if (on) s.MutedDevices.Remove(id); else s.MutedDevices.Add(id); }),
+            SetCategory = SetCategory,
+        });
+
         Toasts.Initialize();
-        Toasts.Clicked += () => Invoke(OpenSettingsWindow);
+        Toasts.Clicked += () => Invoke(() => OpenSettingsWindow(null));
 
         _state = BuildState();
         _ipc = new IpcServer(() => _state, m => Invoke(() => HandleCommand(m)));
@@ -88,6 +102,29 @@ internal static class Program
         _tray.RemoveAll();
         History.Save();
         foreach (var p in Providers) p.DisposeAsync().AsTask().Wait(1000);
+        return 0;
+    }
+
+    /// Opens the panel with sample devices at a point, without focus, for 30 s.
+    static int PanelPreview(string at, string? theme)
+    {
+        var xy = at.Split(',').Select(int.Parse).ToArray();
+        var now = DateTimeOffset.Now;
+        PanelDevice D(string id, string name, DeviceCategory c, int pct, bool charging = false, bool connected = true) =>
+            new(id, name, CategoryIcons.For(c), c, true, connected, charging, pct / 100.0, pct switch { > 50 => 0, > 20 => 1, > 10 => 2, _ => 3 },
+                pct.ToString(), true, true, true, now.AddMinutes(-2));
+        List<PanelDevice> demo =
+        [
+            D("1", "Xbox Wireless Controller", DeviceCategory.Controller, 46, charging: true),
+            D("2", "PRO X Wireless", DeviceCategory.Headphones, 63),
+            D("3", "PRO X Superlight 2", DeviceCategory.Mouse, 44),
+            D("4", "Titorion keyboard", DeviceCategory.Keyboard, 18),
+            D("5", "Galaxy Buds2", DeviceCategory.Earbuds, 9),
+        ];
+        TrayPanel.Init(new PanelHost { Devices = () => demo, Refresh = () => { }, OpenWindow = _ => { }, SetInTray = (_, _) => { }, SetNotify = (_, _) => { }, SetCategory = (_, _) => { } });
+        TrayPanel.Preview(new POINT { X = xy[0], Y = xy[1] }, theme switch { "light" => true, "dark" => false, _ => null });
+        var until = Environment.TickCount64 + 30_000;
+        while (Environment.TickCount64 < until && GetMessage(out var msg, 0, 0, 0) > 0) { TranslateMessage(msg); DispatchMessage(msg); }
         return 0;
     }
 
@@ -127,6 +164,8 @@ internal static class Program
         }
     }
 
+    static void RefreshAndRedraw() => _ = Task.Run(async () => { await RefreshAsync(); PostMessage(_hwnd, WM_DEVICES_CHANGED, 0, 0); });
+
     static StateDto BuildState()
     {
         var devices = Registry.Snapshot()
@@ -150,6 +189,7 @@ internal static class Program
         _tray?.Update(devices, _settings, _estimates);
         _state = BuildState();
         _ipc?.Broadcast(_state);
+        TrayPanel.Update();
         NotifyAlerts(devices);
     }
 
@@ -191,10 +231,7 @@ internal static class Program
                 StateChanged();
                 break;
             case MessageType.SetCategory when m.DeviceId is { } id:
-                if (m.Category is DeviceCategory c) _settings.CategoryOverrides[id] = c;
-                else _settings.CategoryOverrides.Remove(id);
-                SaveSettings();
-                Registry.OverrideCategory(id, m.Category); // raises Changed → StateChanged
+                SetCategory(id, m.Category);
                 break;
             case MessageType.Refresh:
                 _ = Task.Run(RefreshAsync);
@@ -216,7 +253,8 @@ internal static class Program
             if (_tray.TryGetTarget(msg, out var target))
             {
                 uint ev = (uint)(lParam & 0xFFFF);
-                if (ev is NIN_SELECT or NIN_KEYSELECT or NIN_BALLOONUSERCLICK) OpenSettingsWindow(); // left click / Enter / notification click
+                if (ev is NIN_SELECT or NIN_KEYSELECT) TrayPanel.Toggle(); // left click / Enter
+                else if (ev == NIN_BALLOONUSERCLICK) OpenSettingsWindow(null); // tray balloon (no toasts)
                 else if (ev == WM_CONTEXTMENU) ShowMenu(target, (short)(wParam & 0xFFFF), (short)((wParam >> 16) & 0xFFFF));
                 return 0;
             }
@@ -280,7 +318,7 @@ internal static class Program
             int cmd = TrackPopupMenu(menu, TPM_RIGHTBUTTON | TPM_RETURNCMD, x, y, 0, _hwnd, 0);
             switch (cmd)
             {
-                case CmdOpen: OpenSettingsWindow(); break;
+                case CmdOpen: OpenSettingsWindow(null); break;
                 case CmdRefresh: _ = Task.Run(RefreshAsync); break;
                 case CmdExit: PostQuitMessage(0); break;
                 case >= CmdStyleBase: ChangeSettings(s => s.IconStyle = (IconStyle)(cmd - CmdStyleBase)); break;
@@ -291,6 +329,33 @@ internal static class Program
         }
         finally { DestroyMenu(menu); } // destroys the submenu too
     }
+
+    static void SetCategory(string id, DeviceCategory? category)
+    {
+        if (category is DeviceCategory c) _settings.CategoryOverrides[id] = c;
+        else _settings.CategoryOverrides.Remove(id);
+        SaveSettings();
+        Registry.OverrideCategory(id, category); // raises Changed → StateChanged
+    }
+
+    /// The tray panel's tiles: connected devices only, by category and name.
+    static IReadOnlyList<PanelDevice> PanelDevices() => _state.Devices
+        .Where(d => d.Connected) // disconnected devices stay in the window only
+        .OrderBy(d => (int)d.Category).ThenBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase)
+        .Select(d =>
+        {
+            int? level = d.Interpolated ? d.EstimatedPercent : d.Percent;
+            int rough = level ?? d.Level switch { BatteryLevel.Full => 100, BatteryLevel.Good => 60, BatteryLevel.Low => 20, BatteryLevel.Critical => 8, _ => 0 };
+            int step = rough switch { > 50 => 0, > 20 => 1, > 10 => 2, _ => 3 };
+            string number = level?.ToString() ?? d.Level switch
+            {
+                BatteryLevel.Full => "Cheia", BatteryLevel.Good => "Boa", BatteryLevel.Low => "Baixa", BatteryLevel.Critical => "Crítica", _ => "—",
+            };
+            return new PanelDevice(d.Id, d.Name, CategoryIcons.For(d.Category, _settings.DeviceIcons.GetValueOrDefault(d.Id)), d.Category,
+                !_settings.CategoryOverrides.ContainsKey(d.Id), d.Connected, d.Connected && d.Charge == ChargeState.Charging,
+                rough / 100.0, step, number, level != null, d.ShownInTray, d.Notify, d.UpdatedAt);
+        })
+        .ToList();
 
     static void ChangeSettings(Action<Settings> change)
     {
@@ -306,7 +371,7 @@ internal static class Program
 
     /// Brings the settings window to the front, or starts it. It is a separate WinUI 3 process
     /// so the ~100 MB it needs are released when it closes.
-    static void OpenSettingsWindow()
+    static void OpenSettingsWindow(string? page)
     {
         nint existing = FindWindow(SettingsWindowClass, SettingsWindowTitle);
         if (existing != 0)
@@ -323,7 +388,9 @@ internal static class Program
         ];
         var exe = candidates.FirstOrDefault(File.Exists);
         if (exe is null) { Log.Error("settings window not found next to Voltray.exe"); return; }
-        try { Process.Start(new ProcessStartInfo(exe) { UseShellExecute = false }); }
+        var start = new ProcessStartInfo(exe) { UseShellExecute = false };
+        if (page != null) { start.ArgumentList.Add("--page"); start.ArgumentList.Add(page); }
+        try { Process.Start(start); }
         catch (Exception e) { Log.Error($"starting {exe}", e); }
     }
 }

@@ -20,10 +20,10 @@ Voltray shows the battery of your mouse, keyboard, headphones, earbuds and contr
   - **Colored:** the symbol itself turns green, yellow, orange or red with the level.
   - **Number:** symbol on top, percentage below in a pixel font that stays readable at 16 px. The "%" sign and level-colored digits are optional.
 - **One icon per category or one per device.** Per category, two mice share the mouse icon and it shows the lowest battery. Per device, each one gets its own icon, and you can pick that icon from 22 symbols.
-- **Disconnected devices** stay in the tray dimmed with their last level, or are hidden. They are always listed in the window.
-- **Hover** shows the devices and their levels. **Left click** opens the Voltray window; **right click** opens a quick menu (icon style, hide an icon, refresh).
+- **Disconnected devices** are hidden from the tray by default, or stay dimmed with their last level. They are always listed in the window.
+- **Hover** shows the devices and their levels. **Left click** opens a quick panel above the tray: a tile per connected device, filled up to its battery level, on a blurred acrylic background. It opens instantly because the tray app draws it itself. **Right click** opens a quick menu (icon style, hide an icon, refresh).
 - **Low-battery notifications:** any number of rules, each with its own limit and message, plus a test button. Each rule warns once per discharge; crossing several at once shows only the lowest. Never while charging. Optionally, a notice when charging completes. Each device can be muted. Windows Do Not Disturb, including the automatic mode during full-screen games, is respected.
-- **Settings window** (Windows 11 style, light/dark, acrylic): every device with its level, connection state and source; per-device "show in tray", notifications, category and icon; start with Windows; refresh interval.
+- **Compact window** (Windows 11 style, light/dark, acrylic): one card per device whose background is the battery level, with a charging animation (Stream, Bubbles or Sparks). Per-device "show in tray", notifications, category and icon; settings for start with Windows, refresh interval and alerts.
 - **Coexists with vendor software.** Logitech devices are read directly over HID++, with or without G HUB running.
 - **Tiny footprint in the background:** ~5 MB executable, ~9 MB private memory, ~0 % CPU when idle. The settings window is a separate process that exits when closed.
 
@@ -67,11 +67,12 @@ New tray icons go to the overflow (^) area by default. Windows leaves that choic
 
 ```
 Voltray.exe (background, Win32 + NativeAOT, ~5 MB)
- ├─ Providers ── Logitech HID++ · Bluetooth · ...   report devices + readings
+ ├─ Providers ── Logitech HID++ · Titorion · Bluetooth · ...   report devices + readings
  ├─ DeviceRegistry ── classification, user overrides, last-known state
  ├─ BatteryAlerts ── low-battery rules
- └─ TrayManager ── icons per category or per device, tooltips, menus
-       └─ Voltray.Rendering ── tray icon renderer (also used by the window)
+ ├─ TrayManager ── icons per category or per device, tooltips, menus
+ │     └─ Voltray.Rendering ── tray icon renderer (also used by the window)
+ └─ TrayPanel ── left-click panel, drawn with GDI+ on an acrylic backdrop
 
 Voltray.Settings.exe (WinUI 3, started on demand, exits when closed) ◄── named pipe ──► Voltray.exe
 ```
@@ -80,9 +81,9 @@ The settings window runs as a separate process because WinUI 3 keeps ~100 MB in 
 
 ## Roadmap
 
-- **Done:** Logitech HID++, Bluetooth HFP + BLE (untested on hardware), settings window, start with Windows, notification rules, four icon styles, per-device tray icons.
-- **Next:** battery history and estimated time remaining, smoother levels for devices that report in 10 % steps, native Windows notifications with the device image and an "urgent" priority, a better icon picker.
-- **Later:** a compact window centered on the device list, a quick tray panel, Xbox / PlayStation / Switch controllers, Razer and SteelSeries receivers, a 7-day history chart, English, installer and winget.
+- **Done:** Logitech HID++, Titorion 2.4 GHz keyboards, Bluetooth HFP + BLE (untested on hardware), four icon styles, per-device tray icons, notification rules, battery history with time remaining, native notifications, compact window with charging animations, quick tray panel.
+- **Next:** installer and winget, a 7-day history chart, English.
+- **Later:** Xbox / PlayStation controllers, Razer, SteelSeries, HyperX and Corsair receivers.
 
 ## Contributing
 
