@@ -53,7 +53,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $notes = "docs/releases/${{ github.ref_name }}.md"
+          $notes = "docs/release-notes/${{ github.ref_name }}.md"
           $files = Get-ChildItem artifacts/release -File | ForEach-Object FullName
           if (Test-Path $notes) { gh release create "${{ github.ref_name }}" $files --title "Voltray $env:VERSION" --notes-file $notes }
           else { gh release create "${{ github.ref_name }}" $files --title "Voltray $env:VERSION" --generate-notes }
