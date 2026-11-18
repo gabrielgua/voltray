@@ -28,7 +28,9 @@ public sealed class D2DCanvas : IDisposable
 
     public D2DCanvas()
     {
-        var props = new RenderTargetProperties(RenderTargetType.Default,
+        // Software: these are tiny images, and a hardware target would create a GPU device that
+        // costs ~50 MB of memory in a background app that otherwise idles at ~10 MB.
+        var props = new RenderTargetProperties(RenderTargetType.Software,
             new DCommon.PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, DCommon.AlphaMode.Premultiplied), 96, 96, RenderTargetUsage.None, FeatureLevel.Default);
         _rt = Factory.CreateDCRenderTarget(props);
         _rt.TextAntialiasMode = Vortice.Direct2D1.TextAntialiasMode.Grayscale; // ClearType needs an opaque background

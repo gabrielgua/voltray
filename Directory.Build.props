@@ -10,7 +10,7 @@
     <WarningsNotAsErrors>$(WarningsNotAsErrors);IL2104</WarningsNotAsErrors>
     <InvariantGlobalization>true</InvariantGlobalization>
 
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Authors>Gabriel Guaita</Authors>
     <Product>Voltray</Product>
     <Copyright>Copyright (c) 2026 Gabriel Guaita</Copyright>
