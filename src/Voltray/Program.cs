@@ -52,6 +52,7 @@ internal static class Program
         }
 
         if (args is ["--panel-preview", var at, ..]) return PanelPreview(at, args.Length > 2 ? args[2] : null);
+        if (args is ["--taskbar-preview", var style, ..]) return TaskbarPreview(Enum.Parse<TaskbarStyle>(style), args.Length > 2 ? int.Parse(args[2]) : 3);
 
         using var single = new Mutex(true, @"Local\Voltray", out bool first);
         if (!first)
@@ -85,6 +86,13 @@ internal static class Program
             SetCategory = SetCategory,
         });
 
+        TaskbarWidget.Init(new TaskbarHost
+        {
+            Devices = TaskbarDevices,
+            Click = TrayPanel.Toggle,
+            RightClick = (x, y) => ShowMenu(null, x, y),
+        });
+
         Toasts.Initialize();
         Toasts.Clicked += () => Invoke(() => OpenSettingsWindow(null));
 
@@ -102,6 +110,25 @@ internal static class Program
         _tray.RemoveAll();
         History.Save();
         foreach (var p in Providers) p.DisposeAsync().AsTask().Wait(1000);
+        return 0;
+    }
+
+    /// Shows the taskbar text with <paramref name="count"/> sample devices for 20 s (no focus taken).
+    static int TaskbarPreview(TaskbarStyle style, int count)
+    {
+        List<TaskbarDevice> demo =
+        [
+            new(CategoryIcons.For(DeviceCategory.Headphones), 93, false),
+            new(CategoryIcons.For(DeviceCategory.Mouse), 45, true),
+            new(CategoryIcons.For(DeviceCategory.Keyboard), 12, false),
+            new(CategoryIcons.For(DeviceCategory.Controller), 70, false),
+        ];
+        var shown = demo.Take(count).ToList();
+        TaskbarWidget.Init(new TaskbarHost { Devices = () => shown, Click = () => { }, RightClick = (_, _) => { } });
+        TaskbarWidget.Sync(new Settings { Display = DisplayMode.Taskbar, TaskbarStyle = style });
+        var until = Environment.TickCount64 + 20_000;
+        SetTimer(0, 99, 500, 0); // keeps GetMessage waking up to check the deadline
+        while (Environment.TickCount64 < until && GetMessage(out var msg, 0, 0, 0) > 0) { TranslateMessage(msg); DispatchMessage(msg); }
         return 0;
     }
 
@@ -190,6 +217,7 @@ internal static class Program
         _state = BuildState();
         _ipc?.Broadcast(_state);
         TrayPanel.Update();
+        TaskbarWidget.Sync(_settings);
         NotifyAlerts(devices);
     }
 
@@ -248,7 +276,7 @@ internal static class Program
     {
         try
         {
-            if (msg == _taskbarCreated && msg != 0 && _tray != null) { _tray.Recreate(Registry.Snapshot(), _settings); return 0; } // Explorer restarted
+            if (msg == _taskbarCreated && msg != 0 && _tray != null) { _tray.Recreate(Registry.Snapshot(), _settings); TaskbarWidget.Recreate(); return 0; } // Explorer restarted
             if (_tray is null) return DefWindowProc(hwnd, msg, wParam, lParam); // messages sent during CreateWindowEx
             if (_tray.TryGetTarget(msg, out var target))
             {
@@ -289,12 +317,15 @@ internal static class Program
         return DefWindowProc(hwnd, msg, wParam, lParam);
     }
 
-    static void ShowMenu(IconTarget target, int x, int y)
+    /// Right-click menu of a tray icon, or of the taskbar text (<paramref name="target"/> null: every device).
+    static void ShowMenu(IconTarget? target, int x, int y)
     {
         var devices = Registry.Snapshot()
-            .Where(d => target.DeviceId is { } id ? d.Info.Id == id : d.Info.Category == target.Category && !_settings.HiddenDevices.Contains(d.Info.Id))
+            .Where(d => target is not { } t ? d.Connected && !_settings.HiddenDevices.Contains(d.Info.Id)
+                : t.DeviceId is { } id ? d.Info.Id == id : d.Info.Category == t.Category && !_settings.HiddenDevices.Contains(d.Info.Id))
             .ToList();
-        string hideLabel = target.DeviceId != null && devices.Count == 1 ? $"Ocultar {devices[0].Info.Name} da bandeja" : $"Ocultar ícone de {TrayManager.Label(target.Category)}";
+        bool canHide = target != null && _settings.Display == DisplayMode.Tray;
+        string hideLabel = target is not { } tg ? "" : tg.DeviceId != null && devices.Count == 1 ? $"Ocultar {devices[0].Info.Name} da bandeja" : $"Ocultar ícone de {TrayManager.Label(tg.Category)}";
         nint menu = CreatePopupMenu(), style = CreatePopupMenu();
         try
         {
@@ -308,7 +339,7 @@ internal static class Program
             foreach (var (st, label) in StyleMenu)
                 AppendMenu(style, MF_STRING | (_settings.IconStyle == st ? MF_CHECKED : 0), CmdStyleBase + (int)st, label);
             AppendMenu(menu, MF_POPUP, style, "Estilo do ícone");
-            if (devices.Count > 0) AppendMenu(menu, MF_STRING, CmdHideCategory, hideLabel);
+            if (devices.Count > 0 && canHide) AppendMenu(menu, MF_STRING, CmdHideCategory, hideLabel);
             if (_settings.HiddenCategories.Count > 0 || _settings.HiddenDevices.Count > 0) AppendMenu(menu, MF_STRING, CmdShowAll, "Mostrar ícones ocultos");
             AppendMenu(menu, MF_STRING, CmdRefresh, "Atualizar agora");
             AppendMenu(menu, MF_SEPARATOR, 0, null);
@@ -322,8 +353,8 @@ internal static class Program
                 case CmdRefresh: _ = Task.Run(RefreshAsync); break;
                 case CmdExit: PostQuitMessage(0); break;
                 case >= CmdStyleBase: ChangeSettings(s => s.IconStyle = (IconStyle)(cmd - CmdStyleBase)); break;
-                case CmdHideCategory when target.DeviceId is { } id: ChangeSettings(s => s.HiddenDevices.Add(id)); break;
-                case CmdHideCategory: ChangeSettings(s => s.HiddenCategories.Add(target.Category)); break;
+                case CmdHideCategory when target?.DeviceId is { } id: ChangeSettings(s => s.HiddenDevices.Add(id)); break;
+                case CmdHideCategory when target is { } t: ChangeSettings(s => s.HiddenCategories.Add(t.Category)); break;
                 case CmdShowAll: ChangeSettings(s => { s.HiddenCategories.Clear(); s.HiddenDevices.Clear(); }); break;
             }
         }
@@ -354,6 +385,22 @@ internal static class Program
             return new PanelDevice(d.Id, d.Name, CategoryIcons.For(d.Category, _settings.DeviceIcons.GetValueOrDefault(d.Id)), d.Category,
                 !_settings.CategoryOverrides.ContainsKey(d.Id), d.Connected, d.Connected && d.Charge == ChargeState.Charging,
                 rough / 100.0, step, number, level != null, d.ShownInTray, d.Notify, d.UpdatedAt);
+        })
+        .ToList();
+
+    /// The devices written on the taskbar: connected and shown in the tray, in the panel's order.
+    static IReadOnlyList<TaskbarDevice> TaskbarDevices() => _state.Devices
+        .Where(d => d.Connected && d.ShownInTray && !_settings.HiddenCategories.Contains(d.Category))
+        .OrderBy(d => (int)d.Category).ThenBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase)
+        .Select(d =>
+        {
+            int? level = d.Interpolated ? d.EstimatedPercent : d.Percent;
+            string? word = level != null ? null : d.Level switch
+            {
+                BatteryLevel.Full => "Cheia", BatteryLevel.Good => "Boa", BatteryLevel.Low => "Baixa", BatteryLevel.Critical => "Crítica", _ => "—",
+            };
+            return new TaskbarDevice(CategoryIcons.For(d.Category, _settings.DeviceIcons.GetValueOrDefault(d.Id)), level,
+                d.Charge == ChargeState.Charging, word);
         })
         .ToList();
 

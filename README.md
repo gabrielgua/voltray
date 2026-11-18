@@ -19,6 +19,7 @@ Voltray shows the battery of your mouse, keyboard, headphones, earbuds and contr
   - **Vertical bar:** rounded level bar beside the symbol.
   - **Colored:** the symbol itself turns green, yellow, orange or red with the level.
   - **Number:** symbol on top, percentage below in a pixel font that stays readable at 16 px. The "%" sign and level-colored digits are optional.
+- **Or on the taskbar itself:** instead of tray icons, the devices can be written on the taskbar next to the tray (symbol and percentage, optionally with a level bar, or two compact rows). Hovering opens the quick panel. Settings shows a picture of every option.
 - **One icon per category or one per device.** Per category, two mice share the mouse icon and it shows the lowest battery. Per device, each one gets its own icon, and you can pick that icon from 22 symbols.
 - **Disconnected devices** are hidden from the tray by default, or stay dimmed with their last level. They are always listed in the window.
 - **Hover** shows the devices and their levels. **Left click** opens a quick panel above the tray: a tile per connected device, filled up to its battery level, on a blurred acrylic background. It opens instantly because the tray app draws it itself. **Right click** opens a quick menu (icon style, hide an icon, refresh).
@@ -72,7 +73,8 @@ Voltray.exe (background, Win32 + NativeAOT, ~5 MB)
  ├─ BatteryAlerts ── low-battery rules
  ├─ TrayManager ── icons per category or per device, tooltips, menus
  │     └─ Voltray.Rendering ── tray icon renderer (also used by the window)
- └─ TrayPanel ── left-click panel, drawn with GDI+ on an acrylic backdrop
+ ├─ TrayPanel ── left-click panel, drawn with Direct2D on an acrylic backdrop
+ └─ TaskbarWidget ── devices written on the taskbar next to the tray (optional)
 
 Voltray.Settings.exe (WinUI 3, started on demand, exits when closed) ◄── named pipe ──► Voltray.exe
 ```

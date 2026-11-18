@@ -5,6 +5,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Direct2D + DirectWrite for the taskbar text and the tray panel (crisp small text) -->
+    <PackageReference Include="Vortice.Direct2D1" Version="3.8.3" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Voltray.Core\Voltray.Core.csproj" />
     <ProjectReference Include="..\Voltray.Ipc\Voltray.Ipc.csproj" />
   </ItemGroup>

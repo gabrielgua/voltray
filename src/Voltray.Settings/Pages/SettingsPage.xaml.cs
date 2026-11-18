@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Voltray.Core;
 using Voltray.Ipc;
+using Voltray.Settings.Controls;
 using Voltray.Settings.ViewModels;
 
 namespace Voltray.Settings.Pages;
@@ -22,6 +23,7 @@ public sealed partial class SettingsPage : UserControl
         App.Host.StateReceived += Apply;
         if (App.Host.State is { } s) Apply(s);
         Unloaded += (_, _) => App.Host.StateReceived -= Apply;
+        Loaded += (_, _) => { if (_appearance is { } a) BuildAppearance(a); }; // previews need the display scale
     }
 
     void Apply(StateDto state)
@@ -31,8 +33,7 @@ public sealed partial class SettingsPage : UserControl
         {
             IsEnabled = true;
             var s = state.Settings;
-            IconStyleBox.SelectedItem = IconStyleBox.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == s.IconStyle.ToString())
-                ?? IconStyleBox.Items[0];
+            BuildAppearance(s);
             SelectByTag(ChargingAnimationBox, s.ChargingAnimation.ToString());
             PercentSignSwitch.IsOn = s.ShowPercentSign;
             ColorNumberSwitch.IsOn = s.ColorNumber;
@@ -51,10 +52,84 @@ public sealed partial class SettingsPage : UserControl
         finally { _applying = false; }
     }
 
-    void OnIconStyleChanged(object sender, SelectionChangedEventArgs e)
+    // ---- Appearance: where (tray or taskbar) and the style within it, each shown as a picture ----
+
+    static readonly (IconStyle Style, string Name)[] TrayStyles =
+        [(IconStyle.Glyph, "Barra"), (IconStyle.GlyphBarSide, "Barra vertical"), (IconStyle.GlyphColorSteps, "Ícone colorido"), (IconStyle.GlyphNumber, "Número")];
+    static readonly (TaskbarStyle Style, string Name)[] TaskbarStyles =
+        [(TaskbarStyle.IconNumber, "Ícone e número"), (TaskbarStyle.IconNumberBar, "Com barrinha"), (TaskbarStyle.Compact, "Compacto")];
+
+    Ipc.Settings? _appearance;
+    string _appearanceKey = "";
+
+    void BuildAppearance(Ipc.Settings s)
     {
-        if (_applying || IconStyleBox.SelectedItem is not ComboBoxItem { Tag: string tag } || !Enum.TryParse<IconStyle>(tag, out var style)) return;
-        _ = App.Host.ChangeSettingsAsync(s => s.IconStyle = style);
+        _appearance = s;
+        double scale = XamlRoot?.RasterizationScale ?? 1;
+        bool light = AppearancePreview.LightTaskbar();
+        string key = $"{s.Display}|{s.IconStyle}|{s.TaskbarStyle}|{s.ShowPercentSign}|{s.ColorNumber}|{light}|{scale}";
+        if (key == _appearanceKey) return; // rebuilding on every state update would flicker
+        _appearanceKey = key;
+        bool tray = s.Display == DisplayMode.Tray;
+
+        // Where: each option pictured in its current style
+        ModeGrid.Children.Clear();
+        ModeGrid.ColumnDefinitions.Clear();
+        var trayPic = AppearancePreview.Tray(s.IconStyle, light, scale, s.ShowPercentSign, s.ColorNumber);
+        var barPic = AppearancePreview.Taskbar(s.TaskbarStyle, light, scale);
+        AddTile(ModeGrid, 0, "Ícones na bandeja", "Um ícone por categoria ou por dispositivo", trayPic, light, tray,
+            () => _ = App.Host.ChangeSettingsAsync(x => x.Display = DisplayMode.Tray));
+        AddTile(ModeGrid, 1, "Na barra de tarefas", "Ícone e porcentagem ao lado da bandeja", barPic, light, !tray,
+            () => _ = App.Host.ChangeSettingsAsync(x => x.Display = DisplayMode.Taskbar));
+
+        // Style within it
+        StyleGrid.Children.Clear();
+        StyleGrid.ColumnDefinitions.Clear();
+        StyleTitle.Text = tray ? "Estilo dos ícones" : "Estilo na barra de tarefas";
+        StyleSubtitle.Text = tray ? "Como cada ícone mostra a bateria" : "Carregando fica verde-água; abaixo de 20 %, vermelho";
+        if (tray)
+            for (int i = 0; i < TrayStyles.Length; i++)
+            {
+                var (style, name) = TrayStyles[i];
+                AddTile(StyleGrid, i, name, null, AppearancePreview.Tray(style, light, scale, s.ShowPercentSign, s.ColorNumber), light, s.IconStyle == style,
+                    () => _ = App.Host.ChangeSettingsAsync(x => x.IconStyle = style));
+            }
+        else
+            for (int i = 0; i < TaskbarStyles.Length; i++)
+            {
+                var (style, name) = TaskbarStyles[i];
+                AddTile(StyleGrid, i, name, null, AppearancePreview.Taskbar(style, light, scale), light, s.TaskbarStyle == style,
+                    () => _ = App.Host.ChangeSettingsAsync(x => x.TaskbarStyle = style));
+            }
+        TrayOptions.Visibility = tray ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// A selectable picture: a strip of taskbar with the preview on it, and a caption.
+    static void AddTile(Grid grid, int column, string title, string? subtitle, (Microsoft.UI.Xaml.Media.Imaging.WriteableBitmap Image, double Width) pic,
+        bool light, bool selected, Action select)
+    {
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var strip = new Border
+        {
+            Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(AppearancePreview.TaskbarColor(light)),
+            CornerRadius = new CornerRadius(4), Height = AppearancePreview.StripHeight, HorizontalAlignment = HorizontalAlignment.Stretch,
+            Child = new Image { Source = pic.Image, Width = pic.Width, Height = AppearancePreview.StripHeight, Stretch = Microsoft.UI.Xaml.Media.Stretch.Fill,
+                HorizontalAlignment = HorizontalAlignment.Center },
+        };
+        var text = new StackPanel { Children = { new TextBlock { Text = title, FontWeight = selected ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal } } };
+        if (subtitle != null) text.Children.Add(new TextBlock { Text = subtitle, Style = (Style)Application.Current.Resources["SecondaryTextStyle"], TextWrapping = TextWrapping.Wrap });
+        var button = new Button
+        {
+            Content = new StackPanel { Spacing = 8, Children = { strip, text } },
+            HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Top,
+            Padding = new Thickness(8), BorderThickness = new Thickness(2),
+            BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[selected ? "AccentFillColorDefaultBrush" : "CardStrokeColorDefaultBrush"],
+        };
+        AutomationProperties.SetName(button, selected ? $"{title} (selecionado)" : title);
+        button.Click += (_, _) => { if (!selected) select(); };
+        Grid.SetColumn(button, column);
+        grid.Children.Add(button);
     }
 
     void OnChargingAnimationChanged(object sender, SelectionChangedEventArgs e)

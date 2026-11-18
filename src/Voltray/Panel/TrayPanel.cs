@@ -3,7 +3,8 @@ using Microsoft.Win32;
 using Voltray.Core;
 using Voltray.Core.Icons;
 using static Voltray.Interop.Win32;
-using static Voltray.Panel.GdiPlus;
+using Vortice.DirectWrite;
+using Voltray.Rendering;
 
 namespace Voltray.Panel;
 
@@ -34,7 +35,7 @@ internal static unsafe partial class TrayPanel
     const float TileW = (W - 2 * Pad - Gap) / 2;
     const float Radius = 6, IconSize = 22;
 
-    const nint TimerAnim = 1, TimerSlide = 2;
+    const nint TimerAnim = 1, TimerSlide = 2, TimerWatch = 3;
     const int SlideMs = 200;
 
     static PanelHost? _host;
@@ -58,7 +59,6 @@ internal static unsafe partial class TrayPanel
     public static void Init(PanelHost host)
     {
         _host = host;
-        EnsureStarted();
         fixed (char* cls = "VoltrayPanel")
         {
             var wc = new WNDCLASSEXW { cbSize = (uint)sizeof(WNDCLASSEXW), lpfnWndProc = &WndProc, lpszClassName = cls, hCursor = LoadCursorW(0, 32512) };
@@ -85,6 +85,7 @@ internal static unsafe partial class TrayPanel
     public static void Toggle()
     {
         if (_hwnd == 0) return;
+        if (IsVisible && _passive) { Activate(); return; } // opened by hovering: a click keeps it open
         if (IsVisible) { Hide(); return; }
         if (Environment.TickCount64 - _hiddenAt < 400) return; // the click that deactivated it
         Show();
@@ -112,6 +113,42 @@ internal static unsafe partial class TrayPanel
     static POINT? _anchor;
     static bool? _themeOverride;
 
+    // Opened by hovering over the taskbar text: shown without focus, and closed again once the
+    // mouse has left both the text and the panel for a moment. A click in it makes it a normal panel.
+    static bool _passive;
+    static Func<RECT?>? _hoverAnchor;
+    static long _outsideSince;
+
+    public static void ShowOnHover(Func<RECT?> anchor)
+    {
+        if (_hwnd == 0 || IsVisible) return;
+        if (Environment.TickCount64 - _hiddenAt < 400) return;
+        _hoverAnchor = anchor;
+        _passive = true;
+        _outsideSince = 0;
+        Show(activate: false);
+        SetTimer(_hwnd, TimerWatch, 120, 0);
+    }
+
+    static void Activate()
+    {
+        _passive = false;
+        KillTimer(_hwnd, TimerWatch);
+        SetForegroundWindow(_hwnd);
+    }
+
+    static void Watch()
+    {
+        GetCursorPos(out var p);
+        bool inside = Contains(GetRect(_hwnd), p) || (_hoverAnchor?.Invoke() is { } a && Contains(a, p));
+        if (inside) { _outsideSince = 0; return; }
+        if (_outsideSince == 0) _outsideSince = Environment.TickCount64;
+        else if (Environment.TickCount64 - _outsideSince > 350) Hide();
+    }
+
+    static RECT GetRect(nint h) { GetWindowRect(h, out var r); return r; }
+    static bool Contains(RECT r, POINT p) => p.X >= r.Left && p.X < r.Right && p.Y >= r.Top && p.Y < r.Bottom;
+
     static void Show(bool activate = true)
     {
         _devices = _host!.Devices();
@@ -134,6 +171,8 @@ internal static unsafe partial class TrayPanel
 
     static void Hide()
     {
+        _passive = false;
+        KillTimer(_hwnd, TimerWatch);
         KillTimer(_hwnd, TimerAnim);
         KillTimer(_hwnd, TimerSlide);
         ShowWindow(_hwnd, 0 /* SW_HIDE */);
@@ -203,21 +242,15 @@ internal static unsafe partial class TrayPanel
     static uint Argb(uint rgb, int alpha) => (uint)Math.Clamp(alpha, 0, 255) << 24 | (rgb & 0xFFFFFF);
     static uint Fade(uint argb, float k) => Argb(argb, (int)((argb >> 24) * k));
 
+    static D2DCanvas? _canvas;
+
     static void Render()
     {
         if (_bits == null) return;
-        new Span<byte>(_bits, _pw * _ph * 4).Clear();
-        GdipCreateBitmapFromScan0(_pw, _ph, _pw * 4, PixelFormat32bppPARGB, _bits, out nint bmp);
-        GdipGetImageGraphicsContext(bmp, out nint g);
-        try
-        {
-            GdipSetSmoothingMode(g, SmoothingModeAntiAlias);
-            GdipSetPixelOffsetMode(g, PixelOffsetModeHalf);
-            GdipSetTextRenderingHint(g, TextRenderingHintAntiAliasGridFit);
-            GdipScaleWorldTransform(g, _scale, _scale, 0);
-            Draw(g);
-        }
-        finally { GdipDeleteGraphics(g); GdipDisposeImage(bmp); }
+        var g = _canvas ??= new D2DCanvas();
+        g.Begin(_memDc, _pw, _ph, _scale);
+        Draw(g);
+        g.End();
         Present();
     }
 
@@ -228,22 +261,35 @@ internal static unsafe partial class TrayPanel
         ReleaseDC(_hwnd, dc);
     }
 
-    static void Draw(nint g)
+    readonly record struct RectF(float X, float Y, float Width, float Height)
+    {
+        public float Right => X + Width;
+    }
+
+    static class Fonts
+    {
+        public static readonly TextStyle Title = new("Segoe UI Variable Display", 14, FontWeight.SemiBold), Small = new("Segoe UI Variable Text", 12),
+            Link = new("Segoe UI Variable Text", 13), Number = new("Segoe UI Variable Display", 22, FontWeight.SemiBold),
+            Unit = new("Segoe UI Variable Display", 13, FontWeight.SemiBold), Word = new("Segoe UI Variable Display", 16, FontWeight.SemiBold),
+            Glyph = new(D2DCanvas.IconFont, 14), Bolt = new(D2DCanvas.IconFont, 12);
+    }
+
+    static void Draw(D2DCanvas g)
     {
         var c = Colors;
         Hits.Clear();
         float h = _ph / _scale;
-        if (!_backdrop) Fill(g, 0, 0, W, h, c.Fallback);
+        if (!_backdrop) g.Fill(0, 0, W, h, c.Fallback);
 
         // Header: title, refresh, settings
-        Text(g, "Dispositivos", Fonts.Title, new RectF(16, 13, 200, 22), c.Ink);
+        g.Text("Dispositivos", Fonts.Title, 16, 13, 200, c.Ink);
         HeaderButton(g, new RectF(W - Pad - 64, 8, 32, 30), "", Hit.Refresh);
         HeaderButton(g, new RectF(W - Pad - 32, 8, 32, 30), "", Hit.Settings);
 
         // Tiles
         float footerY = h - FooterH;
         if (_devices.Count == 0)
-            Text(g, "Nenhum dispositivo conectado", Fonts.Small, new RectF(0, HeaderH + 20, W, 20), c.Muted, StringAlignmentCenter);
+            g.Text("Nenhum dispositivo conectado", Fonts.Small, 0, HeaderH + 20, W, c.Muted, TextAlignment.Center);
         for (int i = 0; i < _devices.Count; i++)
         {
             float x = Pad + (i % 2) * (TileW + Gap), y = HeaderH + (i / 2) * (TileH + Gap);
@@ -255,32 +301,29 @@ internal static unsafe partial class TrayPanel
         }
 
         // Footer: last update, open the window
-        Fill(g, 0, footerY, W, 1 / _scale, c.Line);
+        g.Fill(0, footerY, W, 1 / _scale, c.Line);
         var last = _devices.Select(d => d.UpdatedAt).Where(t => t != null).Max();
-        Text(g, last is { } t ? "Atualizado " + Ago(t) : "", Fonts.Small, new RectF(16, footerY + 12, 180, 18), c.Muted);
-        float lw = Measure(g, "Abrir Voltray", Fonts.Link) + 16;
+        g.Text(last is { } t ? "Atualizado " + Ago(t) : "", Fonts.Small, 16, footerY + 11, 180, c.Muted);
+        float lw = D2DCanvas.Measure("Abrir Voltray", Fonts.Link) + 16;
         var link = new RectF(W - Pad - lw, footerY + 6, lw, 28);
         Hits.Add((link, Hit.Open, -1));
-        if (_hover == Hits.Count - 1) FillRounded(g, link, 4, c.Hover);
-        Text(g, "Abrir Voltray", Fonts.Link, new RectF(link.X, footerY + 11.5f, lw, 20), c.Accent, StringAlignmentCenter);
+        if (_hover == Hits.Count - 1) g.FillRounded(link.X, link.Y, link.Width, link.Height, 4, c.Hover);
+        g.Text("Abrir Voltray", Fonts.Link, link.X, footerY + 10.5f, lw, c.Accent, TextAlignment.Center);
     }
 
-    static void HeaderButton(nint g, RectF r, string glyph, Hit kind)
+    static void HeaderButton(D2DCanvas g, RectF r, string glyph, Hit kind)
     {
         Hits.Add((r, kind, -1));
-        if (_hover == Hits.Count - 1) FillRounded(g, r, 4, Colors.Hover);
-        Text(g, glyph, Fonts.Glyph, new RectF(r.X, r.Y + 8, r.Width, 16), Colors.Ink, StringAlignmentCenter);
+        if (_hover == Hits.Count - 1) g.FillRounded(r.X, r.Y, r.Width, r.Height, 4, Colors.Hover);
+        g.Text(glyph, Fonts.Glyph, r.X, r.Y + 8, r.Width, Colors.Ink, TextAlignment.Center);
     }
 
-    static void DrawTile(nint g, PanelDevice d, RectF r, bool hover)
+    static void DrawTile(D2DCanvas g, PanelDevice d, RectF r, bool hover)
     {
         var c = Colors;
         float k = d.Connected ? 1 : 0.45f;
-        GdipCreatePath(0, out nint clip);
-        AddRounded(clip, r, Radius);
-        GdipSaveGraphics(g, out uint state);
-        GdipSetClipPath(g, clip, 0);
-        Fill(g, r.X, r.Y, r.Width, r.Height, hover ? c.TileHover : c.Tile);
+        g.PushRoundedClip(r.X, r.Y, r.Width, r.Height, Radius);
+        g.Fill(r.X, r.Y, r.Width, r.Height, hover ? c.TileHover : c.Tile);
 
         float top = r.Y + r.Height * (1 - (float)Math.Clamp(d.Fraction, 0, 1)), bottom = r.Y + r.Height;
         if (d.Connected && d.Fraction > 0)
@@ -291,8 +334,8 @@ internal static unsafe partial class TrayPanel
                 // Strongest at the level line, fading out towards the bottom; the top 10 px softened
                 uint col = Argb(LevelRgb[d.Step], c.FillAlpha);
                 float tip = Math.Min(10, bottom - top);
-                Gradient(g, r.X, top + tip, r.Width, bottom - top - tip, col, col & 0xFFFFFF);
-                Gradient(g, r.X, top, r.Width, tip, Fade(col, 0.4f), col);
+                g.VerticalGradient(r.X, top + tip, r.Width, bottom - top - tip, col, col & 0xFFFFFF);
+                g.VerticalGradient(r.X, top, r.Width, tip, Fade(col, 0.4f), col);
             }
         }
 
@@ -302,196 +345,48 @@ internal static unsafe partial class TrayPanel
             // Over the teal fill everything is white, as in the window; above it keeps its colours
             // (from below the soft tip: the pale tip is too light for white text)
             float solid = top + Math.Min(10, bottom - top);
-            GdipSetClipRect(g, r.X, solid, r.Width, bottom - solid, 1 /* CombineModeIntersect */);
+            g.PushClip(r.X, solid, r.Width, bottom - solid);
             DrawTileContent(g, d, r, 0xFFFFFFFF, 0xE6FFFFFF, 0xFFFFFFFF);
+            g.PopClip();
         }
-
-        GdipRestoreGraphics(g, state);
-        GdipDeletePath(clip);
+        g.PopClip();
     }
 
     /// Icon, charging bolt, name and number of a tile.
-    static void DrawTileContent(nint g, PanelDevice d, RectF r, uint ink, uint muted, uint numColor)
+    static void DrawTileContent(D2DCanvas g, PanelDevice d, RectF r, uint ink, uint muted, uint numColor)
     {
-        DrawIcon(g, d.IconPath, r.X + 12, r.Y + 10, IconSize, ink);
-        if (d.Charging) Text(g, "", Fonts.Bolt, new RectF(r.Right() - 26, r.Y + 13, 14, 14), numColor, StringAlignmentCenter);
-        Text(g, d.Name, Fonts.Small, new RectF(r.X + 12, r.Y + 44, r.Width - 24, 18), muted);
+        g.Icon(d.IconPath, r.X + 12, r.Y + 10, IconSize, ink);
+        if (d.Charging) g.Text("", Fonts.Bolt, r.Right - 26, r.Y + 13, 14, numColor, TextAlignment.Center);
+        g.Text(d.Name, Fonts.Small, r.X + 12, r.Y + 43, r.Width - 24, muted);
         float baseline = r.Y + r.Height - 10;
         string number = d.Connected ? d.Number : "—";
         if (d.Connected && d.HasNumber)
         {
-            Text(g, number, Fonts.Number, new RectF(r.X + 12, baseline - Fonts.Number.Ascent, 120, 30), numColor);
-            float w = Measure(g, number, Fonts.Number);
-            Text(g, "%", Fonts.Unit, new RectF(r.X + 12 + w + 1, baseline - Fonts.Unit.Ascent, 30, 20), numColor);
+            g.TextOnBaseline(number, Fonts.Number, r.X + 12, baseline, numColor);
+            float w = D2DCanvas.Measure(number, Fonts.Number);
+            g.TextOnBaseline("%", Fonts.Unit, r.X + 12 + w + 1, baseline, numColor);
         }
-        else Text(g, number, Fonts.Word, new RectF(r.X + 12, baseline - Fonts.Word.Ascent, r.Width - 24, 24), numColor);
+        else g.TextOnBaseline(number, Fonts.Word, r.X + 12, baseline, numColor);
     }
 
     /// Teal bands rising through the fill, a softer tip and a glow at the level that breathes.
-    static void DrawChargingFill(nint g, RectF r, float top)
+    static void DrawChargingFill(D2DCanvas g, RectF r, float top)
     {
         float bottom = r.Y + r.Height, tip = Math.Min(10, bottom - top);
         double t = _animate ? Environment.TickCount64 / 1000.0 : 0;
         const float period = 170;
         float offset = (float)(t * period / 3.2 % period);
         uint[] full = [0xFF0F7F78, 0xFF1FB5A8, 0xFF0F7F78], soft = [0x660F7F78, 0x661FB5A8, 0x660F7F78];
-        Bands(g, r.X, top + tip, r.Width, bottom - top - tip, full, r.Y - offset, period);
-        Bands(g, r.X, top, r.Width, tip, soft, r.Y - offset, period);
+        g.Bands(r.X, top + tip, r.Width, bottom - top - tip, full, r.Y - offset, period);
+        g.Bands(r.X, top, r.Width, tip, soft, r.Y - offset, period);
         float breath = _animate ? (float)(0.65 + 0.35 * Math.Cos(t * 2 * Math.PI / 1.6)) : 0.8f;
-        Gradient(g, r.X, top, r.Width, Math.Min(18, bottom - top), Argb(0x7FF5E6, (int)((_light ? 0x50 : 0x80) * breath)), 0x007FF5E6);
-    }
-
-    static void Bands(nint g, float x, float y, float w, float h, uint[] colors, float phase, float period)
-    {
-        if (h <= 0) return;
-        float[] pos = [0, 0.5f, 1];
-        GdipCreateLineBrush(new PointF(0, phase), new PointF(0, phase + period), colors[0], colors[2], WrapModeTile, out nint brush);
-        fixed (uint* pc = colors) fixed (float* pp = pos) GdipSetLinePresetBlend(brush, pc, pp, 3);
-        GdipFillRectangle(g, brush, x, y, w, h);
-        GdipDeleteBrush(brush);
-    }
-
-    /// Vertical gradient from <paramref name="topColor"/> to <paramref name="bottomColor"/>.
-    static void Gradient(nint g, float x, float y, float w, float h, uint topColor, uint bottomColor)
-    {
-        if (h <= 0) return;
-        // Endpoints nudged outwards: GDI+ gradients can leak a pixel of the opposite colour at the edges
-        GdipCreateLineBrush(new PointF(0, y - 0.5f), new PointF(0, y + h + 0.5f), topColor, bottomColor, WrapModeTile, out nint brush); // line brushes reject WrapModeClamp
-        GdipFillRectangle(g, brush, x, y, w, h);
-        GdipDeleteBrush(brush);
-    }
-
-    static readonly Dictionary<string, (nint Path, List<PointD> Dots)> IconCache = [];
-
-    /// Hugeicons stroke icon (24×24 grid) at 1.5 px stroke, like the tray and the window.
-    static void DrawIcon(nint g, string svg, float x, float y, float size, uint color)
-    {
-        if (!IconCache.TryGetValue(svg, out var icon))
-        {
-            GdipCreatePath(0, out nint path);
-            var dots = new List<PointD>();
-            foreach (var f in SvgPath.Parse(svg))
-            {
-                if (f.IsDot) { dots.Add(f.Start); continue; }
-                GdipStartPathFigure(path);
-                var p = f.Start;
-                for (int i = 0; i + 2 < f.Segments.Count; i += 3)
-                {
-                    var (c1, c2, e) = (f.Segments[i], f.Segments[i + 1], f.Segments[i + 2]);
-                    GdipAddPathBezier(path, (float)p.X, (float)p.Y, (float)c1.X, (float)c1.Y, (float)c2.X, (float)c2.Y, (float)e.X, (float)e.Y);
-                    p = e;
-                }
-                if (f.Closed) GdipClosePathFigure(path);
-            }
-            IconCache[svg] = icon = (path, dots);
-        }
-        GdipSaveGraphics(g, out uint state);
-        GdipTranslateWorldTransform(g, x, y, 0);
-        GdipScaleWorldTransform(g, size / 24, size / 24, 0);
-        GdipCreatePen1(color, (float)CategoryIcons.Stroke, UnitWorld, out nint pen);
-        GdipSetPenStartCap(pen, LineCapRound);
-        GdipSetPenEndCap(pen, LineCapRound);
-        GdipSetPenLineJoin(pen, LineJoinRound);
-        GdipDrawPath(g, pen, icon.Path);
-        GdipDeletePen(pen);
-        if (icon.Dots.Count > 0)
-        {
-            GdipCreatePath(0, out nint dots);
-            float rad = (float)CategoryIcons.Stroke / 2;
-            foreach (var d in icon.Dots) GdipAddPathEllipse(dots, (float)d.X - rad, (float)d.Y - rad, 2 * rad, 2 * rad);
-            GdipCreateSolidFill(color, out nint b);
-            GdipFillPath(g, b, dots);
-            GdipDeleteBrush(b);
-            GdipDeletePath(dots);
-        }
-        GdipRestoreGraphics(g, state);
-    }
-
-    static void Fill(nint g, float x, float y, float w, float h, uint argb)
-    {
-        GdipCreateSolidFill(argb, out nint b);
-        GdipFillRectangle(g, b, x, y, w, h);
-        GdipDeleteBrush(b);
-    }
-
-    static void FillRounded(nint g, RectF r, float radius, uint argb)
-    {
-        GdipCreatePath(0, out nint path);
-        AddRounded(path, r, radius);
-        GdipCreateSolidFill(argb, out nint b);
-        GdipFillPath(g, b, path);
-        GdipDeleteBrush(b);
-        GdipDeletePath(path);
-    }
-
-    static void AddRounded(nint path, RectF r, float rad)
-    {
-        float d = rad * 2;
-        GdipAddPathArc(path, r.X, r.Y, d, d, 180, 90);
-        GdipAddPathArc(path, r.X + r.Width - d, r.Y, d, d, 270, 90);
-        GdipAddPathArc(path, r.X + r.Width - d, r.Y + r.Height - d, d, d, 0, 90);
-        GdipAddPathArc(path, r.X, r.Y + r.Height - d, d, d, 90, 90);
-        GdipClosePathFigure(path);
-    }
-
-    static float Right(this RectF r) => r.X + r.Width;
-
-    static void Text(nint g, string text, Font font, RectF r, uint argb, int align = StringAlignmentNear)
-    {
-        if (text.Length == 0) return;
-        GdipCreateSolidFill(argb, out nint b);
-        nint fmt = Fonts.Format(align);
-        GdipDrawString(g, text, text.Length, font.Handle, r, fmt, b);
-        GdipDeleteBrush(b);
-    }
-
-    static float Measure(nint g, string text, Font font)
-    {
-        GdipMeasureString(g, text, text.Length, font.Handle, new RectF(0, 0, 1000, 100), Fonts.Format(StringAlignmentNear), out var bounds, out _, out _);
-        return bounds.Width;
+        g.VerticalGradient(r.X, top, r.Width, Math.Min(18, bottom - top), Argb(0x7FF5E6, (int)((_light ? 0x50 : 0x80) * breath)), 0x007FF5E6);
     }
 
     static string Ago(DateTimeOffset t)
     {
         var d = DateTimeOffset.Now - t;
         return d.TotalMinutes < 1 ? "agora" : d.TotalHours < 1 ? $"há {(int)d.TotalMinutes} min" : d.TotalDays < 1 ? $"há {(int)d.TotalHours} h" : $"em {t:dd/MM}";
-    }
-
-    /// A GDI+ font plus the distance from the top of its line box to the baseline, for aligning numbers.
-    sealed record Font(nint Handle, float Ascent);
-
-    static class Fonts
-    {
-        public static readonly Font Title = Create("Segoe UI Semibold", 14), Small = Create("Segoe UI", 12), Link = Create("Segoe UI", 13),
-            Number = Create("Segoe UI Semibold", 22), Unit = Create("Segoe UI Semibold", 13), Word = Create("Segoe UI Semibold", 16),
-            Glyph = CreateIcons(14), Bolt = CreateIcons(12);
-
-        static readonly Dictionary<int, nint> Formats = [];
-
-        static Font Create(string family, float size)
-        {
-            if (GdipCreateFontFamilyFromName(family, 0, out nint fam) != 0) GdipCreateFontFamilyFromName("Segoe UI", 0, out fam);
-            GdipCreateFont(fam, size, FontStyleRegular, UnitPixel, out nint font);
-            GdipGetCellAscent(fam, FontStyleRegular, out ushort asc);
-            GdipGetEmHeight(fam, FontStyleRegular, out ushort em);
-            return new Font(font, size * asc / Math.Max((ushort)1, em));
-        }
-
-        static Font CreateIcons(float size) =>
-            Create(GdipCreateFontFamilyFromName("Segoe Fluent Icons", 0, out nint f) == 0 && GdipDeleteFontFamily(f) == 0 ? "Segoe Fluent Icons" : "Segoe MDL2 Assets", size);
-
-        /// Typographic format (tight measuring), single line, ellipsis when it does not fit.
-        public static nint Format(int align)
-        {
-            if (Formats.TryGetValue(align, out nint f)) return f;
-            GdipStringFormatGetGenericTypographic(out nint generic);
-            GdipCloneStringFormat(generic, out f);
-            GdipGetStringFormatFlags(f, out int flags);
-            GdipSetStringFormatFlags(f, flags | StringFormatFlagsNoWrap);
-            GdipSetStringFormatTrimming(f, StringTrimmingEllipsisCharacter);
-            GdipSetStringFormatAlign(f, align);
-            return Formats[align] = f;
-        }
     }
 
     // ---------------------------------------------------------------- input
@@ -511,6 +406,13 @@ internal static unsafe partial class TrayPanel
                     return 0;
                 case 0x0014: // WM_ERASEBKGND
                     return 1;
+                case 0x0006 when (wParam & 0xFFFF) != 0 && _passive: // activated by a click: stays open
+                    _passive = false;
+                    KillTimer(hwnd, TimerWatch);
+                    return 0;
+                case 0x0113 when wParam == TimerWatch:
+                    Watch();
+                    return 0;
                 case 0x0006 when (wParam & 0xFFFF) == 0: // WM_ACTIVATE, WA_INACTIVE
                     if (!_menuOpen) Hide();
                     return 0;
@@ -645,6 +547,7 @@ internal static unsafe partial class TrayPanel
     [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static partial bool GetMonitorInfoW(nint mon, ref MONITORINFO mi);
     [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static partial bool SetWindowPos(nint h, nint after, int x, int y, int w, int cx, uint flags);
     [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static partial bool IsWindowVisible(nint h);
+    [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static partial bool GetWindowRect(nint h, out RECT r);
     [LibraryImport("user32.dll")] private static partial nint GetForegroundWindow();
     [LibraryImport("user32.dll")] private static partial nint GetDC(nint h);
     [LibraryImport("user32.dll")] private static partial int ReleaseDC(nint h, nint dc);

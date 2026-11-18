@@ -25,6 +25,20 @@ public enum IconStyle
     GlyphNumberCorner = 7,
     GlyphColor = 8,
 }
+/// Where the batteries are shown: tray icons, or text drawn on the taskbar next to the tray.
+public enum DisplayMode { Tray, Taskbar }
+
+/// How devices look on the taskbar (<see cref="DisplayMode.Taskbar"/>).
+public enum TaskbarStyle
+{
+    /// Device symbol and the percentage beside it.
+    IconNumber,
+    /// Symbol, percentage and a thin level bar under the number.
+    IconNumberBar,
+    /// Two small rows, for many devices in little width.
+    Compact,
+}
+
 /// One tray icon per device category (devices of a category share it), or one per device.
 public enum TrayMode { PerCategory, PerDevice }
 
@@ -62,6 +76,8 @@ public sealed class Settings
     /// Mirrors the HKCU Run entry; the registry is the source of truth.
     public bool StartWithWindows { get; set; }
 
+    public DisplayMode Display { get; set; } = DisplayMode.Tray;
+    public TaskbarStyle TaskbarStyle { get; set; } = TaskbarStyle.IconNumber;
     public TrayMode TrayMode { get; set; } = TrayMode.PerCategory;
     public DisconnectedInTray Disconnected { get; set; } = DisconnectedInTray.Hide;
     /// Icon picked per device (key into Voltray.Core.Icons.DeviceIcons); missing = category icon.

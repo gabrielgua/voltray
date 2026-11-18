@@ -14,7 +14,7 @@ internal readonly record struct IconTarget(DeviceCategory Category, string? Devi
 /// Notification-area icons, one per category or one per device (Settings.TrayMode).
 /// Every icon has a stable GUID — fixed per category, derived from the device id per device — so
 /// Windows remembers for each one whether the user pinned it next to the clock. We never force that.
-internal sealed unsafe class TrayManager(nint hwnd, uint callbackMessage)
+internal sealed unsafe partial class TrayManager(nint hwnd, uint callbackMessage)
 {
     /// Callback messages callbackMessage .. callbackMessage + MaxSlots - 1 identify the icon clicked
     /// (with NIF_GUID the shell does not reliably report uID).
@@ -89,6 +89,8 @@ internal sealed unsafe class TrayManager(nint hwnd, uint callbackMessage)
         var options = new IconOptions(settings.ShowPercentSign, settings.ColorNumber);
 
         var wanted = new Dictionary<IconTarget, List<DeviceState>>();
+        _appIconOnly = settings.Display == DisplayMode.Taskbar; // batteries are on the taskbar: one Voltray icon as a way back
+        if (_appIconOnly) visible = [];
         if (settings.TrayMode == TrayMode.PerDevice)
             foreach (var d in visible) wanted[new IconTarget(d.Info.Category, d.Info.Id)] = [d];
         else
@@ -122,9 +124,14 @@ internal sealed unsafe class TrayManager(nint hwnd, uint callbackMessage)
         bool dim = list.Count > 0 && connected.Count == 0 && list.All(d => !d.Connected);
 
         int size = GetSystemMetricsForDpi(SM_CXSMICON, GetDpiForSystem());
-        var px = IconRenderer.Render(style, target.Category, shown?.Battery?.Percent, shown?.Battery?.Charge == ChargeState.Charging,
-            LightTaskbar(), size, options with { Dimmed = dim });
-        nint icon = IconRenderer.CreateHIcon(px, size);
+        nint icon;
+        if (_appIconOnly && list.Count == 0 && AppIcon() is var app && app != 0) icon = app;
+        else
+        {
+            var px = IconRenderer.Render(style, target.Category, shown?.Battery?.Percent, shown?.Battery?.Charge == ChargeState.Charging,
+                LightTaskbar(), size, options with { Dimmed = dim });
+            icon = IconRenderer.CreateHIcon(px, size);
+        }
 
         if (!_shown.TryGetValue(target, out var slot))
         {
@@ -137,7 +144,8 @@ internal sealed unsafe class TrayManager(nint hwnd, uint callbackMessage)
         nid.uFlags |= NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP;
         nid.uCallbackMessage = callbackMessage + (uint)slot.Index;
         nid.hIcon = icon;
-        string tip = list.Count == 0 ? "Voltray\nNenhum dispositivo com bateria encontrado"
+        string tip = _appIconOnly ? "Voltray"
+            : list.Count == 0 ? "Voltray\nNenhum dispositivo com bateria encontrado"
             : target.DeviceId != null ? $"{Shorten(list[0].Info.Name, 60)}\n{Describe(list[0], Est(list[0]))}"
             : Label(target.Category) + "\n" + string.Join("\n", list.Select(d => $"{Shorten(d.Info.Name, 24)} — {Describe(d, Est(d))}"));
         if (tip.Length > 127) tip = tip[..126] + "…"; // szTip limit is 128 chars including the terminator
@@ -214,6 +222,18 @@ internal sealed unsafe class TrayManager(nint hwnd, uint callbackMessage)
     static string Name(IconTarget t) => t.DeviceId ?? t.Category.ToString();
 
     static string Shorten(string s, int max) => s.Length <= max ? s : s[..(max - 1)] + "…";
+
+    bool _appIconOnly;
+
+    /// The app's own icon (a fresh copy each time: the caller destroys it).
+    static nint AppIcon()
+    {
+        nint small = 0;
+        return Environment.ProcessPath is { } exe && ExtractIconExW(exe, 0, 0, ref small, 1) > 0 ? small : 0;
+    }
+
+    [System.Runtime.InteropServices.LibraryImport("shell32.dll", StringMarshalling = System.Runtime.InteropServices.StringMarshalling.Utf16)]
+    private static partial uint ExtractIconExW(string file, int index, nint large, ref nint small, uint count);
 
     static bool LightTaskbar() =>
         Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "SystemUsesLightTheme", 0) is 1;

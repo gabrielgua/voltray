@@ -5,6 +5,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- SharpGen.Runtime (under Vortice, Direct2D) reports one assembly-level trim warning for COM
+         callbacks Voltray does not use; keep it visible but not fatal. -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);IL2104</WarningsNotAsErrors>
     <InvariantGlobalization>true</InvariantGlobalization>
 
     <Version>0.1.0-dev</Version>

@@ -28,103 +28,103 @@
                 </Grid>
             </Border>
 
-            <TextBlock Text="Bandeja do sistema" Style="{StaticResource SectionHeaderStyle}" />
+            <TextBlock Text="Aparência" Style="{StaticResource SectionHeaderStyle}" />
 
             <Border Style="{StaticResource CardStyle}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <FontIcon Glyph="&#xE790;" Style="{StaticResource CardIconStyle}" />
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                        <TextBlock Text="Estilo do ícone" />
-                        <TextBlock Text="Como a bateria aparece na bandeja" Style="{StaticResource SecondaryTextStyle}" />
+                <StackPanel Spacing="12">
+                    <StackPanel>
+                        <TextBlock Text="Onde mostrar a bateria" />
+                        <TextBlock Text="Ícones na bandeja, ou escrita na barra de tarefas ao lado dela" Style="{StaticResource SecondaryTextStyle}" />
                     </StackPanel>
-                    <ComboBox x:Name="IconStyleBox" Grid.Column="2" MinWidth="200" VerticalAlignment="Center" SelectionChanged="OnIconStyleChanged"
-                              AutomationProperties.Name="Estilo do ícone">
-                        <ComboBoxItem Content="Barra" Tag="Glyph" />
-                        <ComboBoxItem Content="Barra vertical" Tag="GlyphBarSide" />
-                        <ComboBoxItem Content="Ícone colorido" Tag="GlyphColorSteps" />
-                        <ComboBoxItem Content="Número" Tag="GlyphNumber" />
-                    </ComboBox>
-                </Grid>
+                    <Grid x:Name="ModeGrid" ColumnSpacing="8" />
+                </StackPanel>
             </Border>
 
             <Border Style="{StaticResource CardStyle}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <FontIcon Glyph="&#xE8EF;" Style="{StaticResource CardIconStyle}" />
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                        <TextBlock Text="Mostrar o símbolo %" />
-                        <TextBlock Text="No estilo Número" Style="{StaticResource SecondaryTextStyle}" />
+                <StackPanel Spacing="12">
+                    <StackPanel>
+                        <TextBlock x:Name="StyleTitle" Text="Estilo" />
+                        <TextBlock x:Name="StyleSubtitle" Style="{StaticResource SecondaryTextStyle}" />
                     </StackPanel>
-                    <ToggleSwitch x:Name="PercentSignSwitch" Grid.Column="2" MinWidth="0" OnContent="Ativado" OffContent="Desativado" Toggled="OnPercentSignToggled"
-                                  AutomationProperties.Name="Mostrar o símbolo %" />
-                </Grid>
+                    <Grid x:Name="StyleGrid" ColumnSpacing="8" />
+                </StackPanel>
             </Border>
 
-            <Border Style="{StaticResource CardStyle}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <FontIcon Glyph="&#xE790;" Style="{StaticResource CardIconStyle}" />
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                        <TextBlock Text="Colorir o número" />
-                        <TextBlock Text="No estilo Número, com a cor do nível" Style="{StaticResource SecondaryTextStyle}" />
-                    </StackPanel>
-                    <ToggleSwitch x:Name="ColorNumberSwitch" Grid.Column="2" MinWidth="0" OnContent="Ativado" OffContent="Desativado" Toggled="OnColorNumberToggled"
-                                  AutomationProperties.Name="Colorir o número" />
-                </Grid>
-            </Border>
+            <StackPanel x:Name="TrayOptions" Spacing="4">
+                <Border Style="{StaticResource CardStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE8EF;" Style="{StaticResource CardIconStyle}" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock Text="Mostrar o símbolo %" />
+                            <TextBlock Text="No estilo Número" Style="{StaticResource SecondaryTextStyle}" />
+                        </StackPanel>
+                        <ToggleSwitch x:Name="PercentSignSwitch" Grid.Column="2" MinWidth="0" OnContent="Ativado" OffContent="Desativado" Toggled="OnPercentSignToggled"
+                                      AutomationProperties.Name="Mostrar o símbolo %" />
+                    </Grid>
+                </Border>
 
-            <Border Style="{StaticResource CardStyle}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <FontIcon Glyph="&#xE8A9;" Style="{StaticResource CardIconStyle}" />
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                        <TextBlock Text="Ícones na bandeja" />
-                        <TextBlock Text="Agrupados por categoria ou um por dispositivo" Style="{StaticResource SecondaryTextStyle}" />
-                    </StackPanel>
-                    <ComboBox x:Name="TrayModeBox" Grid.Column="2" MinWidth="200" VerticalAlignment="Center" SelectionChanged="OnTrayModeChanged"
-                              AutomationProperties.Name="Ícones na bandeja">
-                        <ComboBoxItem Content="Um por categoria" Tag="PerCategory" />
-                        <ComboBoxItem Content="Um por dispositivo" Tag="PerDevice" />
-                    </ComboBox>
-                </Grid>
-            </Border>
+                <Border Style="{StaticResource CardStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE790;" Style="{StaticResource CardIconStyle}" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock Text="Colorir o número" />
+                            <TextBlock Text="No estilo Número, com a cor do nível" Style="{StaticResource SecondaryTextStyle}" />
+                        </StackPanel>
+                        <ToggleSwitch x:Name="ColorNumberSwitch" Grid.Column="2" MinWidth="0" OnContent="Ativado" OffContent="Desativado" Toggled="OnColorNumberToggled"
+                                      AutomationProperties.Name="Colorir o número" />
+                    </Grid>
+                </Border>
 
-            <Border Style="{StaticResource CardStyle}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <FontIcon Glyph="&#xE703;" Style="{StaticResource CardIconStyle}" />
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                        <TextBlock Text="Dispositivo desconectado" />
-                        <TextBlock Text="Como ele aparece na bandeja" Style="{StaticResource SecondaryTextStyle}" />
-                    </StackPanel>
-                    <ComboBox x:Name="DisconnectedBox" Grid.Column="2" MinWidth="200" VerticalAlignment="Center" SelectionChanged="OnDisconnectedChanged"
-                              AutomationProperties.Name="Dispositivo desconectado">
-                        <ComboBoxItem Content="Esmaecido" Tag="Dim" />
-                        <ComboBoxItem Content="Ocultar da bandeja" Tag="Hide" />
-                    </ComboBox>
-                </Grid>
-            </Border>
+                <Border Style="{StaticResource CardStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE8A9;" Style="{StaticResource CardIconStyle}" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock Text="Ícones na bandeja" />
+                            <TextBlock Text="Agrupados por categoria ou um por dispositivo" Style="{StaticResource SecondaryTextStyle}" />
+                        </StackPanel>
+                        <ComboBox x:Name="TrayModeBox" Grid.Column="2" MinWidth="200" VerticalAlignment="Center" SelectionChanged="OnTrayModeChanged"
+                                  AutomationProperties.Name="Ícones na bandeja">
+                            <ComboBoxItem Content="Um por categoria" Tag="PerCategory" />
+                            <ComboBoxItem Content="Um por dispositivo" Tag="PerDevice" />
+                        </ComboBox>
+                    </Grid>
+                </Border>
+
+                <Border Style="{StaticResource CardStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE703;" Style="{StaticResource CardIconStyle}" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock Text="Dispositivo desconectado" />
+                            <TextBlock Text="Como ele aparece na bandeja" Style="{StaticResource SecondaryTextStyle}" />
+                        </StackPanel>
+                        <ComboBox x:Name="DisconnectedBox" Grid.Column="2" MinWidth="200" VerticalAlignment="Center" SelectionChanged="OnDisconnectedChanged"
+                                  AutomationProperties.Name="Dispositivo desconectado">
+                            <ComboBoxItem Content="Esmaecido" Tag="Dim" />
+                            <ComboBoxItem Content="Ocultar da bandeja" Tag="Hide" />
+                        </ComboBox>
+                    </Grid>
+                </Border>
+            </StackPanel>
 
             <TextBlock Text="Notificações" Style="{StaticResource SectionHeaderStyle}" />
 
