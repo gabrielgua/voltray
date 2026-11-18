@@ -1,0 +1,59 @@
+name: Release
+
+# Push a tag like v0.1.0 to build the installer and the portable zip and publish a GitHub release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Version from tag
+        run: echo "VERSION=$('${{ github.ref_name }}'.TrimStart('v'))" >> $env:GITHUB_ENV
+
+      - name: Build and test
+        run: |
+          dotnet build -c Release -p:Version=$env:VERSION
+          dotnet test -c Release --no-build
+
+      - name: Publish (NativeAOT)
+        run: |
+          dotnet publish src/Voltray -c Release -r win-x64 -p:Version=$env:VERSION -o artifacts/publish/Voltray
+          dotnet publish src/Voltray.Settings -c Release -p:Version=$env:VERSION -o artifacts/publish/Voltray/settings
+
+      - name: Installer (Inno Setup)
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          & $iscc /Q /DVersion=$env:VERSION installer/voltray.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Portable zip
+        run: |
+          $stage = "artifacts/stage/Voltray"
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          Copy-Item artifacts/publish/Voltray/* $stage -Recurse -Exclude *.pdb
+          Get-ChildItem $stage -Recurse -Filter *.pdb | Remove-Item
+          Compress-Archive -Path $stage -DestinationPath "artifacts/release/Voltray-$env:VERSION-portable.zip"
+
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $notes = "docs/releases/${{ github.ref_name }}.md"
+          $files = Get-ChildItem artifacts/release -File | ForEach-Object FullName
+          if (Test-Path $notes) { gh release create "${{ github.ref_name }}" $files --title "Voltray $env:VERSION" --notes-file $notes }
+          else { gh release create "${{ github.ref_name }}" $files --title "Voltray $env:VERSION" --generate-notes }

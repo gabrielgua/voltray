@@ -22,12 +22,14 @@ function New-IconBitmap([int]$size) {
 
     $white = [System.Drawing.Brushes]::White
     if ($size -ge 32) {
-        # Battery outline (body + terminal)
+        # Upright battery: body with the terminal on top, bolt in the middle
         $pen = New-Object System.Drawing.Pen ([System.Drawing.Color]::White), (14 * $s)
         $pen.LineJoin = 'Round'
-        $g.DrawRectangle($pen, [float](52 * $s), [float](82 * $s), [float](132 * $s), [float](92 * $s))
-        $g.FillRectangle($white, [float](190 * $s), [float](110 * $s), [float](16 * $s), [float](36 * $s))
-        $bolt = @((136, 92), (96, 134), (124, 134), (110, 166), (154, 120), (126, 120), (140, 92))
+        $g.DrawRectangle($pen, [float](82 * $s), [float](70 * $s), [float](92 * $s), [float](132 * $s))
+        $g.FillRectangle($white, [float](110 * $s), [float](47 * $s), [float](36 * $s), [float](16 * $s))
+        # the small-size bolt, scaled to ~45 % around the body's centre (128, 136)
+        $bolt = @((150, 36), (72, 140), (124, 140), (100, 222), (186, 112), (132, 112), (156, 36)) |
+            ForEach-Object { , @((128 + ($_[0] - 129) * 0.45), (136 + ($_[1] - 129) * 0.45)) }
     } else {
         # Small sizes: a bigger bolt only, so it stays readable
         $bolt = @((150, 36), (72, 140), (124, 140), (100, 222), (186, 112), (132, 112), (156, 36))

@@ -4,7 +4,7 @@
 
 Voltray shows the battery of your mouse, keyboard, headphones, earbuds and controllers next to the Windows clock: one icon per device category, or one per device. It is a small native background app with no vendor software required.
 
-> **Status: early development (v0.1.0-dev).** Logitech HID++ works and is tested on hardware. Bluetooth support is implemented but not yet verified with a real device ([help wanted](#device-support)). See the [roadmap](#roadmap).
+> **Status: early development ([v0.1.0](../../releases/latest)).** Logitech HID++ works and is tested on hardware. Bluetooth support is implemented but not yet verified with a real device ([help wanted](#device-support)). See the [roadmap](#roadmap).
 
 ![The four tray icon styles at 16, 24 and 32 px, on dark and light taskbars](docs/images/tray-icons.png)
 
@@ -47,7 +47,14 @@ Your device is not detected? Run `HidppProbe.exe --list` (Logitech) or `Bluetoot
 
 ## Install
 
-There is no release yet. CI builds a ready-to-run folder on every push (Actions → latest run → **Voltray-win-x64**), or build from source:
+Download the latest version from [Releases](../../releases/latest):
+
+- **Voltray-x.y.z-setup.exe**: installer, for your user only (no admin rights). Adds a Start menu entry and can start Voltray with Windows.
+- **Voltray-x.y.z-portable.zip**: extract anywhere and run `Voltray.exe` (keep the `settings` folder next to it).
+
+The files are not code-signed yet: Windows SmartScreen may say "Windows protected your PC" the first time. Click **More info → Run anyway**.
+
+### Build from source
 
 ```bash
 git clone https://github.com/gabrielgua/voltray
@@ -58,7 +65,7 @@ dotnet publish src/Voltray.Settings -c Release -o artifacts/publish/Voltray/sett
 
 Run `artifacts/publish/Voltray/Voltray.exe`. The `settings` folder must stay next to it.
 
-Requirements: Windows 10 2004 (19041)+ or Windows 11, the [.NET 10 SDK](https://dotnet.microsoft.com/download), and the Visual Studio C++ build tools (for NativeAOT).
+Requirements to build: Windows 10 2004 (19041)+ or Windows 11, the [.NET 10 SDK](https://dotnet.microsoft.com/download), and the Visual Studio C++ build tools (for NativeAOT).
 
 ### Why is my icon hidden?
 
@@ -83,8 +90,8 @@ The settings window runs as a separate process because WinUI 3 keeps ~100 MB in 
 
 ## Roadmap
 
-- **Done:** Logitech HID++, Titorion 2.4 GHz keyboards, Bluetooth HFP + BLE (untested on hardware), four icon styles, per-device tray icons, notification rules, battery history with time remaining, native notifications, compact window with charging animations, quick tray panel.
-- **Next:** installer and winget, a 7-day history chart, English.
+- **Done:** installer and portable release, Logitech HID++, Titorion 2.4 GHz keyboards, Bluetooth HFP + BLE (untested on hardware), four icon styles, per-device tray icons, notification rules, battery history with time remaining, native notifications, compact window with charging animations, quick tray panel.
+- **Next:** winget, a 7-day history chart, English, code signing.
 - **Later:** Xbox / PlayStation controllers, Razer, SteelSeries, HyperX and Corsair receivers.
 
 ## Contributing
